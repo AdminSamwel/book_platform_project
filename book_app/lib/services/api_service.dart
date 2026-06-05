@@ -5,7 +5,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.3.57:8000/api/';
+  static const String baseUrl = 'https://book-platform.up.railway.app/api/';
 
   final FlutterSecureStorage storage = const FlutterSecureStorage();
 
