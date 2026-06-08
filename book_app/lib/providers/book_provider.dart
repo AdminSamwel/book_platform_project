@@ -13,10 +13,10 @@ class BookProvider with ChangeNotifier {
   List<Book> get myLibrary => _myLibrary;
   bool get isLoading => _isLoading;
 
-  Future<void> fetchBooks({String? categorySlug, bool? isFree}) async {
+  Future<void> fetchBooks({String? categorySlug, bool? isFree, String? search}) async {
     _isLoading = true; notifyListeners();
     try {
-      final results = await _api.fetchBooks(categorySlug: categorySlug, isFree: isFree);
+      final results = await _api.fetchBooks(categorySlug: categorySlug, isFree: isFree, search: search);
       _books = results.map((json) => Book.fromJson(json)).toList();
     } catch (e) {
       debugPrint(e.toString());
