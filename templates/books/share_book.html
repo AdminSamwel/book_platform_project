@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ book.title }} - Book Platform</title>
+
+<meta name="description" content="{{ book.description|truncatechars:160 }}">
+
+<!-- Open Graph -->
+<meta property="og:type" content="book">
+<meta property="og:title" content="{{ book.title }}">
+<meta property="og:description" content="{{ book.description|truncatechars:160 }}">
+<meta property="og:url" content="{{ share_url }}">
+{% if cover_url %}<meta property="og:image" content="{{ cover_url }}">{% endif %}
+<meta property="og:site_name" content="Book Platform">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ book.title }}">
+<meta name="twitter:description" content="{{ book.description|truncatechars:160 }}">
+{% if cover_url %}<meta name="twitter:image" content="{{ cover_url }}">{% endif %}
+
+{% if google_client_id %}
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+{% endif %}
+
+<style>
+  :root {
+    --primary: #6c3ce0;
+    --primary-dark: #4d27a8;
+    --bg: #f5f3fb;
+    --text: #2b2440;
+    --muted: #7a7390;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: #fff;
+    box-shadow: 0 0 24px rgba(0,0,0,0.05);
+  }
+  .cover-wrap {
+    width: 100%;
+    aspect-ratio: 3/4;
+    max-height: 360px;
+    background: #ece7f7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .cover-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .content { padding: 20px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .author { color: var(--muted); font-size: 14px; margin-bottom: 12px; }
+  .price-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .price {
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--primary-dark);
+  }
+  .badge {
+    display: inline-block;
+    background: #e6f4ea;
+    color: #1e7e34;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 12px;
+  }
+  .desc {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #4a4460;
+    margin-bottom: 20px;
+    white-space: pre-line;
+  }
+  .btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 14px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-outline {
+    background: #fff;
+    color: var(--primary);
+    border: 1.5px solid var(--primary);
+  }
+  .divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    margin: 22px 0;
+  }
+  .divider::before, .divider::after {
+    content: "";
+    flex: 1;
+    border-bottom: 1px solid #e3e0ee;
+  }
+  .divider span { padding: 0 10px; }
+  .field {
+    margin-bottom: 12px;
+  }
+  .field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .field input {
+    width: 100%;
+    padding: 12px;
+    border: 1.5px solid #e3e0ee;
+    border-radius: 8px;
+    font-size: 15px;
+  }
+  .field input:focus { outline: none; border-color: var(--primary); }
+  .msg {
+    font-size: 13px;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: none;
+  }
+  .msg.error { background: #fdecec; color: #c0392b; display: block; }
+  .msg.success { background: #e6f4ea; color: #1e7e34; display: block; }
+  .otp-row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  .resend-link {
+    font-size: 13px;
+    color: var(--primary);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+  }
+  .resend-link[disabled] { color: var(--muted); cursor: default; }
+  .hidden { display: none; }
+  footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="cover-wrap">
+    {% if cover_url %}
+      <img src="{{ cover_url }}" alt="{{ book.title }}">
+    {% else %}
+      <span style="font-size:48px;">📖</span>
+    {% endif %}
+  </div>
+
+  <div class="content">
+    <h1>{{ book.title }}</h1>
+    <div class="author">na {{ book.book_authors|default:book.author.username }}</div>
+
+    <div class="price-row">
+      {% if book.is_free %}
+        <span class="badge">BURE</span>
+      {% else %}
+        <span class="price">TZS {{ book.price }}</span>
+      {% endif %}
+    </div>
+
+    <div class="desc">{{ book.description }}</div>
+
+    <a class="btn btn-outline" href="{{ deep_link }}">📱 Fungua kwenye App</a>
+
+    <div class="divider"><span>au jiunge sasa kusoma kitabu hiki</span></div>
+
+    <!-- ===== FOMU YA USAJILI ===== -->
+    <div id="register-box">
+      <div id="register-msg" class="msg"></div>
+
+      {% if google_client_id %}
+      <div id="g_id_onload"
+           data-client_id="{{ google_client_id }}"
+           data-callback="handleGoogleCredential">
+      </div>
+      <div class="g_id_signin" data-type="standard" data-shape="pill"
+           data-width="100%" style="margin-bottom:10px;"></div>
+      <div class="divider"><span>au</span></div>
+      {% endif %}
+
+      <form id="register-form">
+        <div class="field">
+          <label>Email au Namba ya Simu</label>
+          <input type="text" id="reg-identifier" placeholder="mfano: jina@email.com au +255712345678" required>
+        </div>
+        <div class="field">
+          <label>Nenosiri</label>
+          <input type="password" id="reg-password" placeholder="Weka nenosiri (angalau herufi 6)" minlength="6" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Jisajili Sasa</button>
+      </form>
+    </div>
+
+    <!-- ===== FOMU YA OTP (imefichwa mwanzoni) ===== -->
+    <div id="otp-box" class="hidden">
+      <div id="otp-msg" class="msg"></div>
+      <form id="otp-form">
+        <div class="field">
+          <label>Nambari ya Uthibitisho (OTP)</label>
+          <input type="text" id="otp-code" inputmode="numeric" maxlength="6" placeholder="000000" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Thibitisha</button>
+        <div class="otp-row">
+          <span style="font-size:13px; color:var(--muted);">Hukupokea nambari?</span>
+          <button type="button" id="resend-btn" class="resend-link">Tuma Tena (<span id="resend-timer">60</span>s)</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ===== UMEFANIKIWA ===== -->
+    <div id="success-box" class="hidden">
+      <div class="msg success">🎉 Umejiunga kikamilifu! Sasa unaweza kufungua App kusoma/kununua kitabu hiki.</div>
+      <a class="btn btn-primary" href="{{ deep_link }}">📱 Fungua kwenye App</a>
+    </div>
+  </div>
+
+  <footer>&copy; Book Platform</footer>
+</div>
+
+<script>
+const BOOK_ID = {{ book.id }};
+const REF = "{{ ref|escapejs }}";
+const API_REGISTER = "{{ api_register_url }}";
+const API_VERIFY = "{{ api_verify_url }}";
+const API_RESEND = "{{ api_resend_url }}";
+const API_GOOGLE = "{{ api_google_auth_url }}";
+
+let currentIdentifier = "";
+let resendTimer = null;
+
+function showMsg(boxId, text, type) {
+  const el = document.getElementById(boxId);
+  el.textContent = text;
+  el.className = "msg " + type;
+}
+
+function startResendTimer() {
+  let seconds = 60;
+  const btn = document.getElementById('resend-btn');
+  const span = document.getElementById('resend-timer');
+  btn.disabled = true;
+  if (resendTimer) clearInterval(resendTimer);
+  resendTimer = setInterval(() => {
+    seconds -= 1;
+    span.textContent = seconds;
+    if (seconds <= 0) {
+      clearInterval(resendTimer);
+      btn.disabled = false;
+      btn.textContent = "Tuma Tena";
+    }
+  }, 1000);
+}
+
+document.getElementById('register-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const identifier = document.getElementById('reg-identifier').value.trim();
+  const password = document.getElementById('reg-password').value;
+
+  const payload = { identifier, password };
+  if (REF) payload.referred_by_book_id = BOOK_ID;
+
+  try {
+    const res = await fetch(API_REGISTER, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const firstError = Object.values(data)[0];
+      throw new Error(Array.isArray(firstError) ? firstError[0] : (data.detail || 'Imeshindikana kujisajili.'));
+    }
+    currentIdentifier = identifier;
+    document.getElementById('register-box').classList.add('hidden');
+    document.getElementById('otp-box').classList.remove('hidden');
+    startResendTimer();
+  } catch (err) {
+    showMsg('register-msg', err.message, 'error');
+  }
+});
+
+document.getElementById('otp-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = document.getElementById('otp-code').value.trim();
+
+  try {
+    const res = await fetch(API_VERIFY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: currentIdentifier, code }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const firstError = Object.values(data)[0];
+      throw new Error(Array.isArray(firstError) ? firstError[0] : (data.detail || 'Nambari si sahihi.'));
+    }
+    document.getElementById('otp-box').classList.add('hidden');
+    document.getElementById('success-box').classList.remove('hidden');
+  } catch (err) {
+    showMsg('otp-msg', err.message, 'error');
+  }
+});
+
+async function handleGoogleCredential(response) {
+  const payload = { id_token: response.credential };
+  if (REF) payload.referred_by_book_id = BOOK_ID;
+  try {
+    const res = await fetch(API_GOOGLE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const firstError = Object.values(data)[0];
+      throw new Error(Array.isArray(firstError) ? firstError[0] : (data.detail || 'Imeshindikana.'));
+    }
+    document.getElementById('register-box').classList.add('hidden');
+    document.getElementById('success-box').classList.remove('hidden');
+  } catch (err) {
+    showMsg('register-msg', err.message, 'error');
+  }
+}
+
+document.getElementById('resend-btn').addEventListener('click', async () => {
+  try {
+    const res = await fetch(API_RESEND, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: currentIdentifier }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Imeshindikana kutuma OTP.');
+    }
+    showMsg('otp-msg', 'Nambari mpya imetumwa.', 'success');
+    startResendTimer();
+  } catch (err) {
+    showMsg('otp-msg', err.message, 'error');
+  }
+});
+</script>
+</body>
+</html>

@@ -29,3 +29,4 @@ class SubscriptionProvider with ChangeNotifier {
     }
   }
 }
+

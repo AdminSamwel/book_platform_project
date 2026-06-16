@@ -5,8 +5,11 @@ Django settings for book_platform project.
 import os
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / '.env')
 
 # ============================================
 # 1. USER MODEL MAALUM (lazima iwe juu)
@@ -17,7 +20,7 @@ AUTH_USER_MODEL = 'users.User'
 # 2. SECURITY
 # ============================================
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-this-to-a-random-secret-key')
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 # ============================================
@@ -41,10 +44,13 @@ INSTALLED_APPS = [
     # Apps zetu
     'users',
     'books',
+    'library',
     'payments',
     'wallet',
     'subscriptions',
     'comments',
+    'adminpanel',
+    'royalties',
 ]
 
 # ============================================
@@ -68,7 +74,7 @@ MIDDLEWARE = [
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -117,9 +123,28 @@ SIMPLE_JWT = {
 }
 
 # ============================================
+# 8a. EMAIL (OTP) & SITE URL
+# ============================================
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@bookplatform.local')
+
+# Anwani kamili ya mfumo - inatumika kujenga link za kushare (Open Graph, deep links)
+SITE_URL = os.environ.get('SITE_URL', 'http://127.0.0.1:8000')
+
+# Google Sign-In - "Web application" OAuth Client ID (backend, Flutter na ukurasa wa share)
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '')
+
+# ============================================
 # 8. ENCRYPTION KEY (DRM)
 # ============================================
-BOOK_ENCRYPTION_KEY = b'12345678901234567890123456789012'  # Badilisha kwa uzalishaji
+_raw_key = os.environ.get('BOOK_ENCRYPTION_KEY', 'IFApUlfc-bh_zKbmEUK5plG5XizcxEITMjbEo1ArZFQ=')
+BOOK_ENCRYPTION_KEY = _raw_key.encode() if isinstance(_raw_key, str) else _raw_key
 
 # ============================================
 # 9. KIMATAIFA, MEDIA, STATIC
@@ -147,3 +172,13 @@ WSGI_APPLICATION = 'book_platform.wsgi.application'
 # ============================================
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://localhost:5000",
+    "http://127.0.0.1:8000",
+]
+# Ruhusu Flutter web ports zote
+CORS_ORIGIN_REGEX_WHITELIST = [
+    r"^http://localhost:\d+$",
+    r"^http://127\.0\.0\.1:\d+$",
+]

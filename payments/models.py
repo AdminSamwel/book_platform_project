@@ -14,3 +14,18 @@ class Purchase(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.book.title}"
+
+
+class CartItem(models.Model):
+    """Kitabu kilichowekwa kwenye kikapu (cart) cha mnunuzi kabla ya kulipia"""
+    user      = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                    related_name='cart_items')
+    book      = models.ForeignKey(Book, on_delete=models.CASCADE, related_name='+')
+    added_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'book')
+        ordering = ['-added_at']
+
+    def __str__(self):
+        return f"{self.user.username} 🛒 {self.book.title}"

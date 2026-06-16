@@ -5,6 +5,7 @@ from datetime import timedelta
 from .models import SubscriptionPlan, UserSubscription
 from .serializers import PlanSerializer, UserSubscriptionSerializer
 from wallet.models import Wallet, Transaction
+from royalties.services import add_subscription_revenue
 
 class PlanListView(generics.ListAPIView):
     queryset = SubscriptionPlan.objects.all()
@@ -23,6 +24,10 @@ class SubscribeView(generics.GenericAPIView):
         wallet.balance -= plan.price
         wallet.save()
         Transaction.objects.create(wallet=wallet, amount=plan.price, transaction_type='debit', description=f"Usajili: {plan.name}")
+        # Mapato ya usajili huingia kwenye kasha la mwezi - yatagawanywa kwa
+        # waandishi mwishoni mwa mwezi kulingana na uwiano wa usomaji.
+        if plan.price > 0:
+            add_subscription_revenue(plan.price)
         # Deactivate previous active subscription
         UserSubscription.objects.filter(user=request.user, is_active=True).update(is_active=False)
         end_date = timezone.now() + timedelta(days=plan.duration_days)

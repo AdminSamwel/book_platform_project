@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/book_provider.dart';
-import '../models/book.dart';
+import '../providers/language_provider.dart';
+import '../l10n/app_strings.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import 'reader_screen.dart';
+import '../utils/responsive.dart';
+import '../widgets/safe_image.dart';
+import '../widgets/language_toggle.dart';
+import 'book_detail_screen.dart';
 
 class MyLibraryScreen extends StatefulWidget {
   const MyLibraryScreen({super.key});
@@ -13,92 +17,207 @@ class MyLibraryScreen extends StatefulWidget {
 }
 
 class _MyLibraryScreenState extends State<MyLibraryScreen> {
+  final ApiService  _api    = ApiService();
+  List<dynamic>     _books  = [];
+  bool              _loading = true;
+  String            _filter  = 'all'; // all | saved | purchased
+
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
-      if (!mounted) return;
-      context.read<BookProvider>().fetchMyLibrary();
-    });
+    _loadLibrary();
+  }
+
+  Future<void> _loadLibrary() async {
+    setState(() => _loading = true);
+    try {
+      final books = await _api.fetchLibrary();
+      if (mounted) setState(() { _books = books; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  List<dynamic> get _filteredBooks {
+    if (_filter == 'saved')     return _books.where((b) => b['is_saved'] == true && b['is_purchased'] != true).toList();
+    if (_filter == 'purchased') return _books.where((b) => b['is_purchased'] == true).toList();
+    return _books;
+  }
+
+  Future<void> _removeFromLibrary(int bookId, String title) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(S.t('Toa kwenye Maktaba?', 'Remove from Library?')),
+        content: Text(S.t(
+          '"$title" itatolewa kwenye maktaba yako.',
+          '"$title" will be removed from your library.')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(S.cancel)),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(S.t('Toa', 'Remove'))),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await _api.removeFromLibrary(bookId);
+      _loadLibrary();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(S.t('Imetolewa kwenye maktaba', 'Removed from library')),
+        backgroundColor: AppTheme.textMuted,
+      ));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('$e'), backgroundColor: AppTheme.danger));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final prov = context.watch<BookProvider>();
+    context.watch<LanguageProvider>();
+    final books = _filteredBooks;
+
     return Scaffold(
+      backgroundColor: AppTheme.bg(context),
       appBar: AppBar(
-        title: const Text('Maktaba Yangu'),
+        title: Text(S.myLibrary),
         flexibleSpace: Container(
             decoration: const BoxDecoration(gradient: AppTheme.headerGradient)),
+        actions: const [
+          LanguageDropdown(),
+          SizedBox(width: 8),
+        ],
       ),
-      body: prov.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : prov.myLibrary.isEmpty
-              ? _emptyState()
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                      child: Text(
-                        '${prov.myLibrary.length} Kitabu',
-                        style: const TextStyle(
-                            color: AppTheme.textMuted, fontSize: 13),
-                      ),
-                    ),
-                    Expanded(
-                      child: GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.65,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
+      body: Column(
+        children: [
+          // Filter chips
+          _buildFilterBar(),
+          // Content
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(
+                    color: AppTheme.primary))
+                : books.isEmpty
+                    ? _emptyState()
+                    : RefreshIndicator(
+                        onRefresh: _loadLibrary,
+                        color: AppTheme.primary,
+                        child: GridView.builder(
+                          padding: EdgeInsets.fromLTRB(
+                            Responsive.pagePadding(context), 12,
+                            Responsive.pagePadding(context), 80),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: Responsive.bookColumns(context),
+                            childAspectRatio: 0.62,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 14,
+                          ),
+                          itemCount: books.length,
+                          itemBuilder: (_, i) => _bookCard(books[i]),
                         ),
-                        itemCount: prov.myLibrary.length,
-                        itemBuilder: (ctx, i) => _bookTile(prov.myLibrary[i]),
                       ),
-                    ),
-                  ],
-                ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _bookTile(Book book) {
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ReaderScreen(bookId: book.id)),
+  Widget _buildFilterBar() {
+    return Container(
+      color: AppTheme.card(context),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _filterChip('all',
+                    S.t('Vyote (${_books.length})', 'All (${_books.length})')),
+                  const SizedBox(width: 8),
+                  _filterChip('saved',
+                    S.t('Zilizohifadhiwa', 'Saved'),
+                    icon: Icons.bookmark_rounded),
+                  const SizedBox(width: 8),
+                  _filterChip('purchased',
+                    S.t('Zilizononuliwa', 'Purchased'),
+                    icon: Icons.shopping_bag_rounded),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _filterChip(String value, String label, {IconData? icon}) {
+    final active = _filter == value;
+    return GestureDetector(
+      onTap: () => setState(() => _filter = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: active ? AppTheme.primary : AppTheme.bg(context),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: active ? AppTheme.primary : AppTheme.borderColor(context)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14,
+                color: active ? Colors.white : AppTheme.textSecondary(context)),
+            const SizedBox(width: 5),
+          ],
+          Text(label, style: TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w600,
+            color: active ? Colors.white : AppTheme.textSecondary(context))),
+        ]),
+      ),
+    );
+  }
+
+  Widget _bookCard(dynamic book) {
+    final id          = book['id'] as int;
+    final title       = book['title']?.toString() ?? '';
+    final author      = book['author_name']?.toString() ?? '';
+    final cover       = book['cover_image']?.toString();
+    final isPurchased = book['is_purchased'] == true;
+    final isSaved     = book['is_saved'] == true;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => BookDetailScreen(bookId: id))),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primary.withValues(alpha: 0.07),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            )
-          ],
+          color: AppTheme.card(context),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: AppTheme.shadow(context),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Cover ──
             Expanded(
-              flex: 5,
+              flex: 6,
               child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(14)),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    book.coverImage != null
-                        ? Image.network(book.coverImage!, fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _placeholder())
-                        : _placeholder(),
-                    // Read button overlay
+                    safeNetworkImage(cover, fit: BoxFit.cover,
+                      placeholder: _placeholder(title)),
+                    // Gradient bottom
                     Positioned(
                       bottom: 0, left: 0, right: 0,
                       child: Container(
@@ -107,48 +226,87 @@ class _MyLibraryScreenState extends State<MyLibraryScreen> {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.6),
-                            ],
+                            colors: [Colors.transparent,
+                              Colors.black.withValues(alpha: 0.55)],
                           ),
                         ),
-                        child: const Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.play_circle_fill_rounded,
-                                  color: Colors.white, size: 16),
-                              SizedBox(width: 4),
-                              Text('Soma',
-                                style: TextStyle(color: Colors.white,
-                                    fontSize: 12, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.play_circle_fill_rounded,
+                                color: Colors.white, size: 15),
+                            const SizedBox(width: 4),
+                            Text(S.readText,
+                                style: const TextStyle(color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold)),
+                          ],
                         ),
+                      ),
+                    ),
+                    // Badge: Saved / Purchased
+                    Positioned(
+                      top: 8, right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isPurchased
+                              ? AppTheme.success
+                              : AppTheme.primary.withValues(alpha: 0.85),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(isPurchased
+                              ? Icons.check_rounded : Icons.bookmark_rounded,
+                              color: Colors.white, size: 10),
+                          const SizedBox(width: 3),
+                          Text(isPurchased
+                              ? S.t('Nununuliwa', 'Bought')
+                              : S.t('Hifadhi', 'Saved'),
+                              style: const TextStyle(color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold)),
+                        ]),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+            // ── Info ──
             Expanded(
-              flex: 2,
+              flex: 3,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(book.title,
-                      maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textDark)),
+                    Text(title, maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary(context), height: 1.2)),
                     const SizedBox(height: 2),
-                    Text(book.authorName,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppTheme.textMuted)),
+                    Text(author, maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10,
+                            color: AppTheme.textSecondary(context))),
+                    const Spacer(),
+                    // Kitufe cha kutoa (kwa vitabu vilivyohifadhiwa tu, si vilivyonunuliwa)
+                    if (isSaved && !isPurchased)
+                      GestureDetector(
+                        onTap: () => _removeFromLibrary(id, title),
+                        child: Row(children: [
+                          const Icon(Icons.bookmark_remove_rounded,
+                              size: 13,
+                              color: AppTheme.danger),
+                          const SizedBox(width: 3),
+                          Text(S.t('Toa', 'Remove'),
+                              style: const TextStyle(fontSize: 10,
+                                  color: AppTheme.danger)),
+                        ]),
+                      ),
                   ],
                 ),
               ),
@@ -159,48 +317,61 @@ class _MyLibraryScreenState extends State<MyLibraryScreen> {
     );
   }
 
-  Widget _placeholder() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppTheme.primary.withValues(alpha: 0.15),
-            AppTheme.secondary.withValues(alpha: 0.1)
-          ],
-        ),
-      ),
-      child: const Center(
-        child: Icon(Icons.menu_book_rounded, size: 44, color: AppTheme.primary),
-      ),
-    );
-  }
+  Widget _placeholder(String title) => Container(
+    decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
+    child: Center(
+      child: Text(title.isNotEmpty ? title[0].toUpperCase() : 'K',
+          style: const TextStyle(color: Colors.white,
+              fontSize: 28, fontWeight: FontWeight.bold)),
+    ),
+  );
 
   Widget _emptyState() {
+    final isSavedFilter = _filter == 'saved';
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isSavedFilter
+                    ? Icons.bookmark_border_rounded
+                    : Icons.library_books_outlined,
+                size: 52, color: AppTheme.primary),
             ),
-            child: const Icon(Icons.library_add_rounded,
-                size: 56, color: AppTheme.primary),
-          ),
-          const SizedBox(height: 20),
-          const Text('Maktaba yako iko tupu',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
-                color: AppTheme.textDark)),
-          const SizedBox(height: 8),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 48),
-            child: Text('Nunua au soma vitabu vya bure ili vionekane hapa',
+            const SizedBox(height: 20),
+            Text(
+              _filter == 'all'
+                  ? S.t('Maktaba yako iko tupu', 'Your library is empty')
+                  : _filter == 'saved'
+                      ? S.t('Hakuna vitabu vilivyohifadhiwa', 'No saved books')
+                      : S.t('Hakuna vitabu vilivyononuliwa', 'No purchased books'),
+              style: TextStyle(fontSize: 17,
+                  fontWeight: FontWeight.bold, color: AppTheme.textPrimary(context)),
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.textMuted, height: 1.5)),
-          ),
-        ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _filter == 'all'
+                  ? S.t(
+                      'Bonyeza ikoni ya bookmark\nkwenye kitabu chochote kukiongeza hapa',
+                      'Tap the bookmark icon\non any book to add it here')
+                  : S.t(
+                      'Rudi kwenye duka la vitabu\nna uhifadhi vitabu unavyovipenda',
+                      'Go back to the book store\nand save books you like'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: AppTheme.textSecondary(context), height: 1.5, fontSize: 13),
+            ),
+          ],
+        ),
       ),
     );
   }

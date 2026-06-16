@@ -10,6 +10,7 @@ db.sqlite3
 *.mo
 local_settings.py
 media/
+.env
 
 # Flutter / Dart
 book_app/.dart_tool/
@@ -27,3 +28,8 @@ book_app/venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Output / log files
+django_out.txt
+book_app/flutter_out.txt
+book_app/flutter_admin_analyze.txt
