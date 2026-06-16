@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/book_provider.dart';
@@ -23,8 +24,10 @@ class BookDetailScreen extends StatefulWidget {
   State<BookDetailScreen> createState() => _BookDetailScreenState();
 }
 
-class _BookDetailScreenState extends State<BookDetailScreen> {
+class _BookDetailScreenState extends State<BookDetailScreen>
+    with TickerProviderStateMixin {
   final ApiService _api  = ApiService();
+  late final AnimationController _bgCtrl;
   Map<String, dynamic>? _detail;
   bool _loading  = true;
   bool _buying   = false;
@@ -45,6 +48,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _bgCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 14),
+    )..repeat();
     _loadDetail();
   }
 
@@ -139,6 +146,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
 
   @override
   void dispose() {
+    _bgCtrl.dispose();
     _reviewCtrl.dispose();
     super.dispose();
   }
@@ -242,8 +250,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(flexibleSpace: Container(
-            decoration: const BoxDecoration(gradient: AppTheme.headerGradient))),
+        appBar: AppBar(backgroundColor: const Color(0xFF0D0D1A)),
         body: const Center(child: CircularProgressIndicator(color: AppTheme.primary)),
       );
     }
@@ -272,9 +279,9 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 280,
+            expandedHeight: 300,
             pinned: true,
-            backgroundColor: AppTheme.primary,
+            backgroundColor: const Color(0xFF0D0D1A),
             foregroundColor: Colors.white,
             actions: [
               _shareButton(),
@@ -287,29 +294,33 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Cover blur background
-                  if (_detail!['cover_image'] != null)
-                    Opacity(opacity: 0.4,
-                        child: safeNetworkImage(
-                            _detail!['cover_image']?.toString(),
-                            fit: BoxFit.cover)),
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: AppTheme.headerGradient),
+                  // Animated category-specific background
+                  AnimatedBuilder(
+                    animation: _bgCtrl,
+                    builder: (_, __) => CustomPaint(
+                      painter: _CategoryBgPainter(
+                        _bgCtrl.value,
+                        _detail!['category_name']?.toString() ?? '',
+                      ),
+                    ),
                   ),
-                  // Cover centered
+                  // Cover image centered on top of animation
                   Center(
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 32),
+                      padding: const EdgeInsets.only(top: 48),
                       child: Container(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.3),
-                            blurRadius: 20)],
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.5),
+                              blurRadius: 28,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
                           child: safeNetworkImage(
                             _detail!['cover_image']?.toString(),
                             width: 120, height: 170),
@@ -1136,4 +1147,582 @@ class _MetaRow {
   final String label;
   final String value;
   const _MetaRow(this.icon, this.label, this.value);
+}
+
+// ── Category-aware animated background ───────────────────────────────────────
+
+enum _CatStyle {
+  books, fiction, science, history, education, business,
+  health, children, sports, arts, romance, religion, thriller,
+}
+
+class _CategoryBgPainter extends CustomPainter {
+  final double t;
+  final String category;
+
+  _CategoryBgPainter(this.t, this.category);
+
+  _CatStyle get _style {
+    final c = category.toLowerCase();
+    if (c.contains('hadithi') || c.contains('fiction') || c.contains('riwaya') ||
+        c.contains('novel') || c.contains('masimulizi')) { return _CatStyle.fiction; }
+    if (c.contains('sayansi') || c.contains('science') || c.contains('teknolojia') ||
+        c.contains('tech') || c.contains('hisabati')) { return _CatStyle.science; }
+    if (c.contains('historia') || c.contains('history') || c.contains('utamaduni') ||
+        c.contains('culture') || c.contains('jamii')) { return _CatStyle.history; }
+    if (c.contains('elimu') || c.contains('education') || c.contains('masomo') ||
+        c.contains('darasa') || c.contains('shule')) { return _CatStyle.education; }
+    if (c.contains('biashara') || c.contains('business') || c.contains('uchumi') ||
+        c.contains('fedha') || c.contains('finance')) { return _CatStyle.business; }
+    if (c.contains('afya') || c.contains('health') || c.contains('matibabu') ||
+        c.contains('dawa') || c.contains('uuguzi')) { return _CatStyle.health; }
+    if (c.contains('watoto') || c.contains('children') || c.contains('mtoto') ||
+        c.contains('vijana')) { return _CatStyle.children; }
+    if (c.contains('michezo') || c.contains('sport') || c.contains('mchezo') ||
+        c.contains('mpira')) { return _CatStyle.sports; }
+    if (c.contains('sanaa') || c.contains('art') || c.contains('muziki') ||
+        c.contains('music') || c.contains('burudani')) { return _CatStyle.arts; }
+    if (c.contains('upendo') || c.contains('romance') || c.contains('mapenzi') ||
+        c.contains('love')) { return _CatStyle.romance; }
+    if (c.contains('dini') || c.contains('religion') || c.contains('imani') ||
+        c.contains('ibada') || c.contains('quran') || c.contains('biblia') ||
+        c.contains('islamic') || c.contains('kristo')) { return _CatStyle.religion; }
+    if (c.contains('thriller') || c.contains('msisitizo') || c.contains('horror') ||
+        c.contains('mystery') || c.contains('siri') || c.contains('uhalifu')) { return _CatStyle.thriller; }
+    return _CatStyle.books;
+  }
+
+  static List<Color> _gradientFor(_CatStyle s) {
+    switch (s) {
+      case _CatStyle.books:     return const [Color(0xFF0D0D1A), Color(0xFF14082B), Color(0xFF081624)];
+      case _CatStyle.fiction:   return const [Color(0xFF070025), Color(0xFF110042), Color(0xFF040015)];
+      case _CatStyle.science:   return const [Color(0xFF002530), Color(0xFF003A48), Color(0xFF001520)];
+      case _CatStyle.history:   return const [Color(0xFF1C1000), Color(0xFF2B1900), Color(0xFF0F0A00)];
+      case _CatStyle.education: return const [Color(0xFF001435), Color(0xFF002050), Color(0xFF000C22)];
+      case _CatStyle.business:  return const [Color(0xFF001A10), Color(0xFF002C1A), Color(0xFF000E08)];
+      case _CatStyle.health:    return const [Color(0xFF1A0015), Color(0xFF280020), Color(0xFF0D000B)];
+      case _CatStyle.children:  return const [Color(0xFF14003A), Color(0xFF200058), Color(0xFF0A0025)];
+      case _CatStyle.sports:    return const [Color(0xFF1A0800), Color(0xFF2C1200), Color(0xFF0D0400)];
+      case _CatStyle.arts:      return const [Color(0xFF1A0028), Color(0xFF28003E), Color(0xFF0D0018)];
+      case _CatStyle.romance:   return const [Color(0xFF1A0010), Color(0xFF280018), Color(0xFF0D0008)];
+      case _CatStyle.religion:  return const [Color(0xFF1A1400), Color(0xFF281E00), Color(0xFF0D0B00)];
+      case _CatStyle.thriller:  return const [Color(0xFF050508), Color(0xFF080810), Color(0xFF020205)];
+    }
+  }
+
+  static double _speedFor(_CatStyle s) {
+    if (s == _CatStyle.sports || s == _CatStyle.thriller) { return 1.8; }
+    if (s == _CatStyle.romance || s == _CatStyle.religion) { return 0.65; }
+    return 1.0;
+  }
+
+  // [xFactor, phaseOffset] for 12 floating elements
+  static const List<List<double>> _pos = [
+    [0.07, 0.00], [0.20, 0.18], [0.34, 0.38], [0.50, 0.55],
+    [0.65, 0.12], [0.80, 0.72], [0.92, 0.30], [0.14, 0.82],
+    [0.44, 0.25], [0.57, 0.48], [0.75, 0.65], [0.88, 0.08],
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final style = _style;
+
+    // 1. Background gradient
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = LinearGradient(
+          colors: _gradientFor(style),
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ).createShader(Offset.zero & size),
+    );
+
+    // 2. Style-specific background texture
+    _drawTexture(canvas, size, style);
+
+    // 3. Floating particle elements
+    final speed = _speedFor(style);
+    for (int i = 0; i < _pos.length; i++) {
+      final p = _pos[i];
+      final progress = ((t * speed) + p[1]) % 1.0;
+      final x = size.width * p[0];
+      final y = size.height * (1.05 - progress * 1.1);
+      final op = (math.sin(progress * math.pi) * 0.32).clamp(0.0, 0.32);
+      if (op < 0.01) continue;
+      final sz = 15.0 + (i % 5) * 3.5;
+      canvas.save();
+      canvas.translate(x, y);
+      _drawElement(canvas, style, i, sz, op);
+      canvas.restore();
+    }
+  }
+
+  // ── Background textures ───────────────────────────────────────────────────
+
+  void _drawTexture(Canvas canvas, Size size, _CatStyle style) {
+    if (style == _CatStyle.science) {
+      _hexGrid(canvas, size);
+    } else if (style == _CatStyle.fiction) {
+      _starField(canvas, size);
+    } else if (style == _CatStyle.thriller) {
+      _scanLines(canvas, size);
+    } else {
+      _dotGrid(canvas, size);
+    }
+    // Radial ambient glow for atmospheric styles
+    Color? glowColor;
+    if (style == _CatStyle.romance) glowColor = const Color(0xFF8B0040);
+    if (style == _CatStyle.religion) glowColor = const Color(0xFF5C4200);
+    if (style == _CatStyle.fiction)  glowColor = const Color(0xFF2E0080);
+    if (glowColor != null) {
+      canvas.drawCircle(
+        Offset(size.width / 2, size.height * 0.4),
+        size.width * 0.7,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [glowColor.withValues(alpha: 0.28), Colors.transparent],
+          ).createShader(Rect.fromCircle(
+            center: Offset(size.width / 2, size.height * 0.4),
+            radius: size.width * 0.7)),
+      );
+    }
+  }
+
+  void _dotGrid(Canvas canvas, Size size) {
+    final p = Paint()..color = Colors.white.withValues(alpha: 0.04);
+    for (double dx = 0; dx < size.width; dx += 30) {
+      for (double dy = 0; dy < size.height; dy += 30) {
+        canvas.drawCircle(Offset(dx, dy), 1.2, p);
+      }
+    }
+  }
+
+  void _hexGrid(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = Colors.cyanAccent.withValues(alpha: 0.06)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.7;
+    const r = 24.0;
+    final rowH = r * math.sqrt(3);
+    for (double row = -1; row * rowH < size.height + rowH; row++) {
+      for (double col = -1; col * r * 1.5 < size.width + r * 2; col++) {
+        final cx = col * r * 3 + (row.toInt().isOdd ? r * 1.5 : 0);
+        final cy = row * rowH;
+        final path = Path();
+        for (int v = 0; v < 6; v++) {
+          final a = v * math.pi / 3;
+          final vx = cx + math.cos(a) * (r - 1);
+          final vy = cy + math.sin(a) * (r - 1);
+          v == 0 ? path.moveTo(vx, vy) : path.lineTo(vx, vy);
+        }
+        path.close();
+        canvas.drawPath(path, p);
+      }
+    }
+  }
+
+  void _starField(Canvas canvas, Size size) {
+    final rng = math.Random(42);
+    final p = Paint()..color = Colors.white.withValues(alpha: 0.22);
+    for (int i = 0; i < 70; i++) {
+      canvas.drawCircle(
+        Offset(rng.nextDouble() * size.width, rng.nextDouble() * size.height),
+        rng.nextDouble() * 1.3 + 0.3, p);
+    }
+  }
+
+  void _scanLines(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = Colors.white.withValues(alpha: 0.03)
+      ..strokeWidth = 0.6;
+    for (double dy = 0; dy < size.height; dy += 5) {
+      canvas.drawLine(Offset(0, dy), Offset(size.width, dy), p);
+    }
+  }
+
+  // ── Element dispatcher ────────────────────────────────────────────────────
+
+  void _drawElement(Canvas canvas, _CatStyle style, int i, double s, double op) {
+    if (style == _CatStyle.books) {
+      canvas.rotate((i % 5 - 2) * 0.18);
+      _book(canvas, s, op);
+    } else if (style == _CatStyle.fiction) {
+      canvas.rotate(t * math.pi * 0.12 * (i.isEven ? 1 : -1));
+      _star5(canvas, s, op);
+    } else if (style == _CatStyle.science) {
+      canvas.rotate(_pos[i][1] * math.pi);
+      if (i.isEven) { _hexagon(canvas, s, op); } else { _atom(canvas, s, op); }
+    } else if (style == _CatStyle.history) {
+      canvas.rotate(_pos[i][1] * 0.8);
+      if (i.isEven) { _hourglass(canvas, s, op); } else { _gear(canvas, s, op); }
+    } else if (style == _CatStyle.education) {
+      canvas.rotate(_pos[i][1] * 0.4);
+      if (i.isEven) { _cap(canvas, s, op); } else { _pencil(canvas, s, op); }
+    } else if (style == _CatStyle.business) {
+      if (i.isEven) { _barChart(canvas, s, op); } else { _arrowUp(canvas, s, op); }
+    } else if (style == _CatStyle.health) {
+      if (i.isEven) {
+        _heart(canvas, s, op, Colors.pinkAccent);
+      } else {
+        _cross(canvas, s, op);
+      }
+    } else if (style == _CatStyle.children) {
+      final m = i % 3;
+      if (m == 0) {
+        _balloon(canvas, s, op);
+      } else if (m == 1) {
+        _star5(canvas, s * 0.75, op);
+      } else {
+        _cloud(canvas, s, op);
+      }
+    } else if (style == _CatStyle.sports) {
+      canvas.rotate(_pos[i][1] * 0.6);
+      if (i.isEven) { _lightning(canvas, s, op); } else { _ball(canvas, s, op); }
+    } else if (style == _CatStyle.arts) {
+      canvas.rotate(_pos[i][1] * 0.5);
+      if (i.isEven) { _musicNote(canvas, s, op); } else { _palette(canvas, s, op); }
+    } else if (style == _CatStyle.romance) {
+      canvas.rotate(_pos[i][1] * 0.3);
+      if (i.isEven) {
+        _heart(canvas, s, op, Colors.pinkAccent);
+      } else {
+        _petal(canvas, s * 0.7, op);
+      }
+    } else if (style == _CatStyle.religion) {
+      canvas.rotate(_pos[i][1] * math.pi / 6);
+      if (i.isEven) { _star8(canvas, s, op); } else { _crescent(canvas, s, op); }
+    } else {
+      // thriller
+      canvas.rotate(_pos[i][1] * 0.2);
+      if (i.isEven) { _rainStreak(canvas, s, op); } else { _lightning(canvas, s * 0.8, op); }
+    }
+  }
+
+  // ── Shape drawing functions ───────────────────────────────────────────────
+
+  void _book(Canvas canvas, double s, double op) {
+    final w = s * 0.62;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset.zero, width: w, height: s),
+        const Radius.circular(2)),
+      Paint()..color = Colors.white.withValues(alpha: op));
+    canvas.drawRect(Rect.fromLTWH(-w / 2, -s / 2, w * 0.16, s),
+      Paint()..color = Colors.white.withValues(alpha: op * 0.5));
+    final lp = Paint()..color = Colors.black.withValues(alpha: op * 0.3)..strokeWidth = 0.8;
+    for (int i = 1; i <= 3; i++) {
+      canvas.drawLine(
+        Offset(-w * 0.1, -s * 0.25 + i * s * 0.12),
+        Offset(w * 0.38,  -s * 0.25 + i * s * 0.12), lp);
+    }
+  }
+
+  void _star5(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final path = Path();
+    for (int i = 0; i < 10; i++) {
+      final a = i * math.pi / 5 - math.pi / 2;
+      final rr = i.isEven ? r : r * 0.42;
+      i == 0
+          ? path.moveTo(math.cos(a) * rr, math.sin(a) * rr)
+          : path.lineTo(math.cos(a) * rr, math.sin(a) * rr);
+    }
+    path.close();
+    canvas.drawPath(path, Paint()..color = Colors.white.withValues(alpha: op));
+  }
+
+  void _hexagon(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final path = Path();
+    for (int i = 0; i < 6; i++) {
+      final a = i * math.pi / 3;
+      i == 0
+          ? path.moveTo(math.cos(a) * r, math.sin(a) * r)
+          : path.lineTo(math.cos(a) * r, math.sin(a) * r);
+    }
+    path.close();
+    canvas.drawPath(path, Paint()
+      ..color = Colors.cyanAccent.withValues(alpha: op)
+      ..style = PaintingStyle.stroke..strokeWidth = 1.5);
+    canvas.drawCircle(Offset.zero, r * 0.28,
+      Paint()..color = Colors.cyanAccent.withValues(alpha: op * 0.7));
+  }
+
+  void _atom(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final p = Paint()
+      ..color = Colors.cyanAccent.withValues(alpha: op)
+      ..style = PaintingStyle.stroke..strokeWidth = 1.2;
+    for (int i = 0; i < 3; i++) {
+      canvas.save();
+      canvas.rotate(i * math.pi / 3);
+      canvas.drawOval(Rect.fromCenter(
+        center: Offset.zero, width: r * 2.0, height: r * 0.75), p);
+      canvas.restore();
+    }
+    canvas.drawCircle(Offset.zero, r * 0.22,
+      Paint()..color = Colors.cyanAccent.withValues(alpha: op));
+  }
+
+  void _hourglass(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final c = const Color(0xFFD4A853).withValues(alpha: op);
+    canvas.drawPath(
+      Path()..moveTo(-r, -r)..lineTo(r, -r)..lineTo(0, 0)..close(),
+      Paint()..color = c);
+    canvas.drawPath(
+      Path()..moveTo(-r, r)..lineTo(r, r)..lineTo(0, 0)..close(),
+      Paint()..color = c);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset.zero, width: r * 2.2, height: r * 2.2),
+        const Radius.circular(3)),
+      Paint()..color = c..style = PaintingStyle.stroke..strokeWidth = 1.5);
+  }
+
+  void _gear(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final p = Paint()
+      ..color = const Color(0xFFD4A853).withValues(alpha: op)
+      ..style = PaintingStyle.stroke..strokeWidth = 1.5;
+    canvas.drawCircle(Offset.zero, r * 0.65, p);
+    canvas.drawCircle(Offset.zero, r * 0.28, p);
+    for (int i = 0; i < 8; i++) {
+      final a = i * math.pi / 4;
+      canvas.drawLine(
+        Offset(math.cos(a) * r * 0.65, math.sin(a) * r * 0.65),
+        Offset(math.cos(a) * r, math.sin(a) * r), p);
+    }
+  }
+
+  void _cap(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final c = Colors.lightBlueAccent.withValues(alpha: op);
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, -r * 0.5)..lineTo(r, 0)
+        ..lineTo(0, r * 0.4)..lineTo(-r, 0)..close(),
+      Paint()..color = c);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(-r * 0.45, r * 0.38, r * 0.9, r * 0.38),
+        const Radius.circular(2)),
+      Paint()..color = c);
+    final lp = Paint()..color = c..strokeWidth = 1.5;
+    canvas.drawLine(Offset(r * 0.5, 0), Offset(r * 0.72, r * 0.6), lp);
+    canvas.drawCircle(Offset(r * 0.72, r * 0.68), r * 0.1, Paint()..color = c);
+  }
+
+  void _pencil(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(0, -r * 0.1), width: r * 0.35, height: r * 1.35),
+        const Radius.circular(2)),
+      Paint()..color = Colors.lightBlueAccent.withValues(alpha: op));
+    canvas.drawPath(
+      Path()
+        ..moveTo(-r * 0.175, r * 0.57)..lineTo(r * 0.175, r * 0.57)
+        ..lineTo(0, r * 0.9)..close(),
+      Paint()..color = Colors.amber.withValues(alpha: op * 0.9));
+    canvas.drawRect(
+      Rect.fromCenter(center: Offset(0, -r * 0.75), width: r * 0.35, height: r * 0.22),
+      Paint()..color = Colors.pink.withValues(alpha: op * 0.7));
+  }
+
+  void _barChart(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    const bw = 0.32;
+    final xPos   = [-r * 0.62, -r * 0.22, r * 0.18, r * 0.58];
+    final heights = [r * 0.7,   r * 1.1,   r * 0.85, r * 1.4];
+    for (int i = 0; i < 4; i++) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(xPos[i] - r * bw / 2, -heights[i], r * bw, heights[i]),
+          const Radius.circular(2)),
+        Paint()..color = Colors.greenAccent.withValues(alpha: op * (0.45 + i * 0.12)));
+    }
+    canvas.drawLine(Offset(-r, 0), Offset(r, 0),
+      Paint()..color = Colors.greenAccent.withValues(alpha: op * 0.45)..strokeWidth = 1.2);
+  }
+
+  void _arrowUp(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final p = Paint()
+      ..color = Colors.greenAccent.withValues(alpha: op)
+      ..strokeWidth = 2.2..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round;
+    canvas.drawLine(Offset(0, r * 0.9), Offset(0, -r * 0.9), p);
+    canvas.drawLine(Offset(0, -r * 0.9), Offset(-r * 0.5, -r * 0.35), p);
+    canvas.drawLine(Offset(0, -r * 0.9), Offset(r * 0.5, -r * 0.35), p);
+  }
+
+  void _heart(Canvas canvas, double s, double op, Color tint) {
+    final r = s / 2;
+    final c = tint.withValues(alpha: op);
+    final p = Paint()..color = c;
+    canvas.drawCircle(Offset(-r * 0.28, -r * 0.22), r * 0.42, p);
+    canvas.drawCircle(Offset( r * 0.28, -r * 0.22), r * 0.42, p);
+    canvas.drawPath(
+      Path()
+        ..moveTo(-r * 0.64, -r * 0.1)
+        ..lineTo( r * 0.64, -r * 0.1)
+        ..lineTo(0, r * 0.62)..close(),
+      p);
+  }
+
+  void _cross(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final p = Paint()
+      ..color = Colors.pinkAccent.withValues(alpha: op)
+      ..strokeWidth = s * 0.22..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(0, -r * 0.9), Offset(0, r * 0.9), p);
+    canvas.drawLine(Offset(-r * 0.65, -r * 0.22), Offset(r * 0.65, -r * 0.22), p);
+  }
+
+  void _balloon(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    canvas.drawCircle(Offset(0, -r * 0.18), r * 0.72,
+      Paint()..color = Colors.purpleAccent.withValues(alpha: op));
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, r * 0.54)
+        ..quadraticBezierTo(r * 0.18, r * 0.72, r * 0.05, r),
+      Paint()
+        ..color = Colors.purpleAccent.withValues(alpha: op * 0.55)
+        ..style = PaintingStyle.stroke..strokeWidth = 1.2);
+    canvas.drawCircle(Offset(0, r * 0.54), r * 0.1,
+      Paint()..color = Colors.purpleAccent.withValues(alpha: op));
+  }
+
+  void _cloud(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final p = Paint()..color = Colors.white.withValues(alpha: op * 0.82);
+    canvas.drawCircle(Offset(-r * 0.32, r * 0.08), r * 0.48, p);
+    canvas.drawCircle(Offset( r * 0.32, r * 0.08), r * 0.48, p);
+    canvas.drawCircle(Offset(0, -r * 0.14), r * 0.60, p);
+    canvas.drawRect(Rect.fromLTWH(-r * 0.8, r * 0.04, r * 1.6, r * 0.52), p);
+  }
+
+  void _lightning(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    canvas.drawPath(
+      Path()
+        ..moveTo( r * 0.22, -r)
+        ..lineTo(-r * 0.12, -r * 0.04)
+        ..lineTo( r * 0.18, -r * 0.04)
+        ..lineTo(-r * 0.22,  r)
+        ..lineTo( r * 0.12,  r * 0.04)
+        ..lineTo(-r * 0.18,  r * 0.04)
+        ..close(),
+      Paint()..color = Colors.orangeAccent.withValues(alpha: op));
+  }
+
+  void _ball(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final p = Paint()
+      ..color = Colors.orangeAccent.withValues(alpha: op)
+      ..style = PaintingStyle.stroke..strokeWidth = 1.5;
+    canvas.drawCircle(Offset.zero, r, p);
+    canvas.drawArc(
+      Rect.fromCenter(center: Offset.zero, width: r * 1.6, height: r * 0.9),
+      0, math.pi, false, p);
+    canvas.drawArc(
+      Rect.fromCenter(center: Offset.zero, width: r * 1.6, height: r * 0.9),
+      math.pi, math.pi, false, p);
+  }
+
+  void _musicNote(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final c = Colors.purpleAccent.withValues(alpha: op);
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(-r * 0.15, r * 0.42), width: r * 0.72, height: r * 0.52),
+      Paint()..color = c);
+    canvas.drawRect(
+      Rect.fromLTWH(r * 0.21, -r * 0.92, r * 0.16, r * 1.44),
+      Paint()..color = c);
+    canvas.drawPath(
+      Path()
+        ..moveTo(r * 0.37, -r * 0.92)
+        ..cubicTo(r * 0.9, -r * 0.42, r * 0.9, -r * 0.02, r * 0.37, r * 0.08),
+      Paint()
+        ..color = c..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.22..strokeCap = StrokeCap.round);
+  }
+
+  void _palette(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(0, r * 0.1), width: r * 1.8, height: r * 1.4),
+      Paint()
+        ..color = Colors.purpleAccent.withValues(alpha: op)
+        ..style = PaintingStyle.stroke..strokeWidth = 1.5);
+    final dotOffsets = [
+      Offset(-r * 0.50, -r * 0.22), Offset(-r * 0.12, -r * 0.48),
+      Offset( r * 0.28, -r * 0.38), Offset( r * 0.55, -r * 0.05),
+      Offset( r * 0.38,  r * 0.32),
+    ];
+    final dotColors = [
+      Colors.redAccent, Colors.yellowAccent, Colors.blueAccent,
+      Colors.greenAccent, Colors.pinkAccent,
+    ];
+    for (int j = 0; j < dotOffsets.length; j++) {
+      canvas.drawCircle(dotOffsets[j], r * 0.18,
+        Paint()..color = dotColors[j].withValues(alpha: op * 0.9));
+    }
+    canvas.drawCircle(Offset(-r * 0.42, r * 0.38), r * 0.18,
+      Paint()
+        ..color = Colors.purpleAccent.withValues(alpha: op)
+        ..style = PaintingStyle.stroke..strokeWidth = 1.5);
+  }
+
+  void _petal(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset.zero, width: r * 0.5, height: r * 1.2),
+      Paint()..color = Colors.pinkAccent.withValues(alpha: op));
+  }
+
+  void _star8(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final gold = const Color(0xFFFFD700).withValues(alpha: op);
+    final p = Paint()..color = gold..style = PaintingStyle.stroke..strokeWidth = 1.5;
+    for (int i = 0; i < 2; i++) {
+      canvas.save();
+      canvas.rotate(i * math.pi / 4);
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset.zero, width: r * 1.3, height: r * 1.3), p);
+      canvas.restore();
+    }
+    canvas.drawCircle(Offset.zero, r * 0.25, Paint()..color = gold);
+  }
+
+  void _crescent(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    canvas.drawPath(
+      Path.combine(
+        PathOperation.difference,
+        Path()..addOval(Rect.fromCircle(center: Offset.zero, radius: r)),
+        Path()..addOval(Rect.fromCircle(
+          center: Offset(r * 0.42, -r * 0.08), radius: r * 0.78)),
+      ),
+      Paint()..color = const Color(0xFFFFD700).withValues(alpha: op));
+  }
+
+  void _rainStreak(Canvas canvas, double s, double op) {
+    final r = s / 2;
+    final p = Paint()
+      ..color = Colors.blueGrey.withValues(alpha: op * 0.8)
+      ..strokeWidth = 1.0..strokeCap = StrokeCap.round;
+    for (int i = -2; i <= 2; i++) {
+      final x = i * r * 0.35;
+      final len = r * (0.9 + i.abs() * 0.12);
+      canvas.drawLine(Offset(x - len * 0.1, -len), Offset(x + len * 0.1, len), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CategoryBgPainter old) =>
+      old.t != t || old.category != category;
 }
