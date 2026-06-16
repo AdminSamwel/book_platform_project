@@ -323,32 +323,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      Row(
-                        children: [
-                          const Expanded(child: Divider()),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(S.orContinueWith,
-                                style: TextStyle(color: AppTheme.textSecondary(context))),
-                          ),
-                          const Expanded(child: Divider()),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: 52,
-                        child: OutlinedButton.icon(
-                          onPressed: auth.isLoading ? null : _registerWithGoogle,
-                          icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
-                          label: Text(S.continueWithGoogle,
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                      if (AuthProvider.isGoogleSignInSupported) ...[
+                        Row(
+                          children: [
+                            const Expanded(child: Divider()),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(S.orContinueWith,
+                                  style: TextStyle(color: AppTheme.textSecondary(context))),
+                            ),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            onPressed: auth.isLoading ? null : _registerWithGoogle,
+                            icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                            label: Text(S.continueWithGoogle,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
+                        const SizedBox(height: 20),
+                      ],
 
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,

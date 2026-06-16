@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../config/google_config.dart';
@@ -159,11 +159,37 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Rudisha true kama platform inasaidia Google Sign-In.
+  /// google_sign_in ^6 inasaidia: Android, iOS, macOS, Web.
+  /// Haifanyi kazi: Windows, Linux.
+  static bool get isGoogleSignInSupported {
+    if (kIsWeb) return true;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+  }
+
+  /// Rudisha true kama Google OAuth Client ID imewekwa vizuri.
+  static bool get isGoogleConfigured =>
+      googleWebClientId.isNotEmpty &&
+      !googleWebClientId.startsWith('WEKA_') &&
+      googleWebClientId.contains('.apps.googleusercontent.com');
+
   /// Ingia/Jisajili kwa akaunti ya Google. [referredByBookId] (hiari) -
   /// kitabu kilichoshirikiwa (share) ambacho kilimleta mtumiaji huyu.
   Future<void> loginWithGoogle({int? referredByBookId}) async {
     _isLoading = true; notifyListeners();
     try {
+      if (!isGoogleSignInSupported) {
+        throw Exception(
+          'Google Sign-In haisaidiwi kwenye kifaa hiki. '
+          'Tafadhali tumia jina la mtumiaji na nywila.');
+      }
+      if (!isGoogleConfigured) {
+        throw Exception(
+          'Google Sign-In haijasanidiwa bado. '
+          'Wasiliana na msimamizi kuweka Google Client ID.');
+      }
       final googleSignIn = GoogleSignIn(serverClientId: googleWebClientId);
       final account = await googleSignIn.signIn();
       if (account == null) throw Exception('Imeghairiwa.');
