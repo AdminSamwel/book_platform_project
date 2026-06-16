@@ -50,10 +50,6 @@ class _BookDetailScreenState extends State<BookDetailScreen>
   // Subscription usage (for free-plan selection flow)
   Map<String, dynamic>? _subUsage;
 
-  // Offline
-  bool _isOffline = false;
-  bool _downloadingOffline = false;
-
   @override
   void initState() {
     super.initState();
@@ -81,14 +77,10 @@ class _BookDetailScreenState extends State<BookDetailScreen>
         _loading = false;
       });
       _loadRatings();
-      // Load subscription usage and offline status in background
+      // Load subscription usage in background
       _api.fetchSubscriptionUsage().then((u) {
         if (mounted) setState(() => _subUsage = u);
       }).catchError((_) {});
-      OfflineBookService.instance
-          .isAvailableOffline(widget.bookId)
-          .then((v) { if (mounted) setState(() => _isOffline = v); })
-          .catchError((_) {});
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
@@ -258,8 +250,8 @@ class _BookDetailScreenState extends State<BookDetailScreen>
         _api.fetchSubscriptionUsage().then((u) {
           if (mounted) setState(() => _subUsage = u);
         }).catchError((_) {});
-        // Offer offline download
-        _offerOfflineDownload();
+        // Silently cache book encrypted for offline reading
+        _autoCacheBook();
         final data = await context.read<BookProvider>().fetchBookDetail(widget.bookId);
         if (mounted) setState(() => _detail = data);
       }
@@ -275,59 +267,20 @@ class _BookDetailScreenState extends State<BookDetailScreen>
     }
   }
 
-  void _offerOfflineDownload() {
-    if (!mounted) return;
+  /// Encrypted auto-cache — runs silently in background after purchase.
+  /// No visible "Download" button; fully transparent to the user.
+  void _autoCacheBook() {
     final title = _detail?['title']?.toString() ?? '';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        const Icon(Icons.offline_bolt_rounded, color: Colors.white, size: 18),
-        const SizedBox(width: 8),
-        Expanded(child: Text(
-          S.t('Pakua "$title" kwa kusoma nje ya mtandao?',
-              'Download "$title" for offline reading?'),
-          maxLines: 2)),
-      ]),
-      backgroundColor: const Color(0xFF0EA5E9),
-      duration: const Duration(seconds: 6),
-      action: SnackBarAction(
-        label: S.t('Pakua', 'Download'),
-        textColor: Colors.white,
-        onPressed: _downloadForOffline,
-      ),
-    ));
-  }
-
-  Future<void> _downloadForOffline() async {
-    if (_downloadingOffline) return;
-    setState(() => _downloadingOffline = true);
-    try {
-      final result = await _api.fetchBookBytes(widget.bookId);
-      final raw   = result['bytes'] as Uint8List;
-      final ct    = (result['content_type'] as String?) ?? 'text/plain';
-      final title = _detail?['title']?.toString() ?? 'book_${widget.bookId}';
-      final ok = await OfflineBookService.instance.saveBook(
-        bookId: widget.bookId, bytes: raw,
-        contentType: ct, title: title,
+    _api.fetchBookBytes(widget.bookId).then((result) {
+      final bytes = result['bytes'] as Uint8List;
+      final ct    = (result['content_type'] as String? ?? 'text/plain');
+      OfflineBookService.instance.saveBook(
+        bookId: widget.bookId,
+        bytes: bytes,
+        contentType: ct,
+        title: title,
       );
-      if (mounted) {
-        setState(() => _isOffline = ok);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(ok
-              ? S.t('Kitabu kimehifadhiwa kwa offline!', 'Book saved for offline!')
-              : S.t('Imeshindwa kuhifadhi — faili kubwa sana.',
-                    'Could not save — file too large.')),
-          backgroundColor: ok ? AppTheme.success : AppTheme.danger,
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-          backgroundColor: AppTheme.danger));
-      }
-    } finally {
-      if (mounted) setState(() => _downloadingOffline = false);
-    }
+    }).catchError((_) {});
   }
 
   Future<void> _selectFreeBook() async {
@@ -1352,38 +1305,6 @@ class _BookDetailScreenState extends State<BookDetailScreen>
             ),
           ),
 
-        // Offline download button — inaonekana tu kwa vitabu vilivyonunuliwa
-        if (!blocked && !isFree) ...[
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            icon: _downloadingOffline
-                ? const SizedBox(width: 16, height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : Icon(_isOffline
-                    ? Icons.offline_bolt_rounded
-                    : Icons.download_for_offline_rounded,
-                    color: _isOffline
-                        ? const Color(0xFF10B981) : AppTheme.textSecondary(context)),
-            label: Text(
-              _downloadingOffline
-                  ? S.t('Inapakua...', 'Downloading...')
-                  : _isOffline
-                      ? S.t('Imepakuliwa (Offline)', 'Downloaded (Offline)')
-                      : S.t('Pakua kwa Offline', 'Download for Offline'),
-              style: TextStyle(
-                color: _isOffline ? const Color(0xFF10B981)
-                    : AppTheme.textSecondary(context)),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              side: BorderSide(
-                color: _isOffline
-                    ? const Color(0xFF10B981)
-                    : AppTheme.borderColor(context)),
-            ),
-            onPressed: _downloadingOffline || _isOffline ? null : _downloadForOffline,
-          ),
-        ],
       ],
     );
   }
