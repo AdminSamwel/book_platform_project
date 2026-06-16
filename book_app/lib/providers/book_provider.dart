@@ -74,13 +74,14 @@ class BookProvider with ChangeNotifier {
     }
   }
 
-  Future<void> purchaseBook(int bookId) async {
+  Future<Map<String, dynamic>> purchaseBook(int bookId) async {
     final res = await _api.purchaseBook(bookId);
     if (res.statusCode != 201) {
       final body = jsonDecode(res.body);
       throw Exception(body['detail'] ?? 'Imeshindwa kununua');
     }
     await fetchMyLibrary();
+    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 }
 

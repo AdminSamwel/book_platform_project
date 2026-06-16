@@ -46,6 +46,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     context.watch<LanguageProvider>();
     final auth = context.watch<AuthProvider>();
+    final topInset = MediaQuery.of(context).padding.top;
     return Scaffold(
       drawer: _buildDrawer(auth),
       body: RefreshIndicator(
@@ -55,42 +56,83 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           slivers: [
             SliverAppBar(
               pinned: true,
-              expandedHeight: 140,
-              backgroundColor: AppTheme.primary,
+              expandedHeight: topInset + kToolbarHeight + 110,
+              backgroundColor: const Color(0xFF1E1B4B),
+              foregroundColor: Colors.white,
               leading: Builder(
                 builder: (ctx) => IconButton(
                   icon: const Icon(Icons.menu_rounded, color: Colors.white),
                   onPressed: () => Scaffold.of(ctx).openDrawer(),
                 ),
               ),
-              actions: const [LanguageDropdown(), SizedBox(width: 8)],
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
-                  padding: const EdgeInsets.fromLTRB(20, 60, 20, 16),
-                  child: Align(
-                    alignment: Alignment.bottomLeft,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(S.adminDashboard,
-                          style: const TextStyle(color: Colors.white,
-                              fontSize: 22, fontWeight: FontWeight.bold),
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 4),
-                        Text(
-                          auth.username.isEmpty
-                              ? '${S.greeting}!'
-                              : '${S.greeting}, ${auth.username}',
-                          style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.85),
-                              fontSize: 13),
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
+              actions: [
+                const LanguageDropdown(),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(right: 14),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
                     ),
+                    child: const Icon(Icons.admin_panel_settings_rounded,
+                        color: Colors.white, size: 20),
                   ),
+                ),
+              ],
+              flexibleSpace: FlexibleSpaceBar(
+                background: Stack(
+                  children: [
+                    Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF1E1B4B), Color(0xFF4C1D95),
+                              Color(0xFF4F46E5)],
+                          begin: Alignment.topLeft, end: Alignment.bottomRight,
+                        ),
+                      ),
+                    ),
+                    Positioned(top: -20, right: -20, child: _bokeh(150, 0.14)),
+                    Positioned(bottom: 10, right: 90, child: _bokeh(70, 0.11)),
+                    Positioned(top: 50, left: -25, child: _bokeh(100, 0.09)),
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                          20, topInset + kToolbarHeight + 4, 20, 18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(mainAxisSize: MainAxisSize.min,
+                                children: [
+                              const Icon(Icons.shield_rounded,
+                                  color: Colors.white70, size: 12),
+                              const SizedBox(width: 5),
+                              Text(S.adminDashboard,
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 11)),
+                            ]),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            auth.username.isEmpty
+                                ? '${S.greeting}!'
+                                : '${S.greeting}, ${auth.username}!',
+                            style: const TextStyle(color: Colors.white,
+                                fontSize: 22, fontWeight: FontWeight.w800),
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -127,9 +169,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(S.overview,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16,
-                color: AppTheme.textPrimary(context))),
+          _sectionLabel(S.overview),
           const SizedBox(height: 12),
           GridView.count(
             crossAxisCount: 2,
@@ -162,9 +202,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          Text(S.dashboard,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16,
-                color: AppTheme.textPrimary(context))),
+          _sectionLabel(S.dashboard),
           const SizedBox(height: 12),
           _navCard(Icons.people_rounded, S.manageUsers,
               const [Color(0xFF6366F1), Color(0xFF818CF8)],
@@ -293,29 +331,57 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         children: [
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
-            decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.fromLTRB(20, 60, 20, 24),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF1E1B4B), Color(0xFF4C1D95), Color(0xFF4F46E5)],
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+              ),
+            ),
+            child: Stack(
               children: [
-                const CircleAvatar(
-                  radius: 28, backgroundColor: Colors.white24,
-                  child: Icon(Icons.admin_panel_settings_rounded,
-                      color: Colors.white, size: 30),
+                Positioned(top: -10, right: -10, child: _bokeh(80, 0.12)),
+                Positioned(bottom: 0, right: 55, child: _bokeh(50, 0.09)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.4), width: 2),
+                      ),
+                      child: const CircleAvatar(
+                        radius: 28, backgroundColor: Colors.white24,
+                        child: Icon(Icons.admin_panel_settings_rounded,
+                            color: Colors.white, size: 30),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(auth.username,
+                      style: const TextStyle(color: Colors.white, fontSize: 18,
+                          fontWeight: FontWeight.bold),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(S.adminDashboard,
+                        style: const TextStyle(color: Colors.white,
+                            fontSize: 11, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Text(auth.username,
-                  style: const TextStyle(color: Colors.white, fontSize: 18,
-                      fontWeight: FontWeight.bold),
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
-                Text(S.adminDashboard,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12)),
               ],
             ),
           ),
           Expanded(
             child: ListView(
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 _drawerItem(Icons.dashboard_rounded, S.dashboard,
                     () => Navigator.pop(context)),
@@ -339,7 +405,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   Navigator.push(context,
                       MaterialPageRoute(builder: (_) => const AdminRoyaltiesScreen()));
                 }),
-                const Divider(),
+                const Divider(height: 24),
                 _drawerItem(Icons.logout_rounded, S.logout, () {
                   auth.logout();
                   Navigator.pushNamedAndRemoveUntil(context, '/', (r) => false);
@@ -352,12 +418,50 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _drawerItem(IconData icon, String label, VoidCallback onTap, {Color? color}) {
+  Widget _drawerItem(IconData icon, String label, VoidCallback onTap,
+      {Color? color}) {
     final c = color ?? AppTheme.textPrimary(context);
     return ListTile(
-      leading: Icon(icon, color: c),
-      title: Text(label, style: TextStyle(color: c, fontWeight: FontWeight.w500)),
+      leading: Container(
+        width: 36, height: 36,
+        decoration: BoxDecoration(
+          color: c.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: c, size: 20),
+      ),
+      title: Text(label,
+          style: TextStyle(color: c, fontWeight: FontWeight.w500, fontSize: 14)),
       onTap: onTap,
+      horizontalTitleGap: 12,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
     );
   }
+
+  Widget _bokeh(double size, double alpha) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: Colors.white.withValues(alpha: alpha),
+    ),
+  );
+
+  Widget _sectionLabel(String title) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 4, height: 20,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF4C1D95), Color(0xFF4F46E5)],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+          color: AppTheme.textPrimary(context))),
+    ],
+  );
 }

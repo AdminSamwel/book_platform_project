@@ -3,11 +3,37 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from datetime import timedelta
 from books.models import Book
 from wallet.models import Wallet, Transaction
 from royalties.services import record_purchase_earning
 from .models import Purchase, CartItem
 from .serializers import PurchaseSerializer, CartItemSerializer
+
+
+def _check_and_auto_upgrade(user):
+    """Kama mtumiaji amenunua vitabu 5+, mpa Pro plan bila malipo (mara moja)."""
+    from subscriptions.models import SubscriptionPlan, UserSubscription
+
+    total = Purchase.objects.filter(user=user, book__is_free=False).count()
+    if total < 5:
+        return None
+
+    active = UserSubscription.objects.filter(
+        user=user, is_active=True, end_date__gt=timezone.now()
+    ).select_related('plan').first()
+    if active and active.plan and active.plan.level >= 2:
+        return None  # Tayari ana Pro au zaidi
+
+    pro_plan = SubscriptionPlan.objects.filter(level=2).first()
+    if not pro_plan:
+        return None
+
+    UserSubscription.objects.filter(user=user, is_active=True).update(is_active=False)
+    end_date = timezone.now() + timedelta(days=30)
+    UserSubscription.objects.create(
+        user=user, plan=pro_plan, end_date=end_date, is_active=True)
+    return pro_plan.name
 
 class PurchaseBookView(generics.GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -34,9 +60,13 @@ class PurchaseBookView(generics.GenericAPIView):
             record_purchase_earning(book, amount)
 
         Purchase.objects.create(user=user, book=book, amount=amount, payment_id="mock_txn_123")
-        # Toa kwenye cart endapo kilikuwepo
         CartItem.objects.filter(user=user, book=book).delete()
-        return Response({"detail": "Umefanikiwa kununua kitabu."}, status=status.HTTP_201_CREATED)
+        upgraded_plan = _check_and_auto_upgrade(user)
+        detail = "Umefanikiwa kununua kitabu."
+        if upgraded_plan:
+            detail += f" Hongera! Umepandishwa kiotomatiki kwenye mpango wa {upgraded_plan}."
+        return Response({"detail": detail, "auto_upgraded": bool(upgraded_plan)},
+                        status=status.HTTP_201_CREATED)
 
 class MyLibraryView(generics.ListAPIView):
     serializer_class = PurchaseSerializer
@@ -154,12 +184,20 @@ class CartCheckoutView(APIView):
             purchased_titles.append(book.title)
 
         CartItem.objects.filter(user=user, book_id__in=[it.book_id for it in items]).delete()
+        upgraded_plan = _check_and_auto_upgrade(user)
 
-        return Response({
+        resp = {
             "detail": "Malipo yamefanikiwa.",
             "purchased": purchased_titles,
             "total_paid": str(total),
-        }, status=status.HTTP_201_CREATED)
+            "auto_upgraded": bool(upgraded_plan),
+        }
+        if upgraded_plan:
+            resp["upgrade_message"] = (
+                f"Hongera! Umenunua vitabu zaidi ya 5 — umepandishwa kiotomatiki "
+                f"kwenye mpango wa {upgraded_plan} kwa siku 30 bila malipo."
+            )
+        return Response(resp, status=status.HTTP_201_CREATED)
 
 
 # ====================================================================

@@ -110,10 +110,11 @@ class _AuthorDashboardScreenState extends State<AuthorDashboardScreen> {
   }
 
   Widget _buildHeader(AuthProvider auth) {
+    final topInset = MediaQuery.of(context).padding.top;
     return SliverAppBar(
-      expandedHeight: 160,
+      expandedHeight: topInset + kToolbarHeight + 110,
       pinned: true,
-      backgroundColor: AppTheme.primary,
+      backgroundColor: const Color(0xFF3730A3),
       foregroundColor: Colors.white,
       leading: Builder(
         builder: (ctx) => IconButton(
@@ -121,47 +122,89 @@ class _AuthorDashboardScreenState extends State<AuthorDashboardScreen> {
           onPressed: () => Scaffold.of(ctx).openDrawer(),
         ),
       ),
-      actions: const [
-        LanguageDropdown(),
-        SizedBox(width: 4),
-        NotificationBell(),
-        SizedBox(width: 8),
+      actions: [
+        const LanguageDropdown(),
+        const SizedBox(width: 4),
+        const NotificationBell(),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen())),
+          child: Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.55), width: 2),
+              ),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                backgroundImage: (auth.avatarUrl?.isNotEmpty ?? false)
+                    ? NetworkImage(auth.avatarUrl!) : null,
+                child: (auth.avatarUrl == null || auth.avatarUrl!.isEmpty)
+                    ? Text(
+                        auth.username.isEmpty ? 'A' :
+                        auth.username[0].toUpperCase(),
+                        style: const TextStyle(color: Colors.white,
+                            fontWeight: FontWeight.bold, fontSize: 13))
+                    : null,
+              ),
+            ),
+          ),
+        ),
       ],
       flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
-          padding: const EdgeInsets.fromLTRB(20, 80, 20, 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Row(
+        background: Stack(
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF3730A3), Color(0xFF6D28D9), Color(0xFF4F46E5)],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+            Positioned(top: -20, right: -20, child: _bokeh(150, 0.14)),
+            Positioned(bottom: 10, right: 90, child: _bokeh(70, 0.11)),
+            Positioned(top: 50, left: -25, child: _bokeh(100, 0.09)),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                  20, topInset + kToolbarHeight + 4, 20, 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.edit_rounded,
-                        color: Colors.white, size: 20),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.edit_rounded,
+                          color: Colors.white70, size: 12),
+                      const SizedBox(width: 5),
+                      Text(S.authorDashboard,
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 11)),
+                    ]),
                   ),
-                  const SizedBox(width: 10),
-                  Text(S.authorDashboard,
-                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  Text(
+                    auth.username.isEmpty
+                        ? '${S.greeting}! ✍️'
+                        : '${S.greeting}, ${auth.username[0].toUpperCase()}${auth.username.substring(1)}! ✍️',
+                    style: const TextStyle(color: Colors.white,
+                        fontSize: 22, fontWeight: FontWeight.w800),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(
-                auth.username.isEmpty ? '${S.greeting}!' :
-                '${S.greeting}, ${auth.username[0].toUpperCase()}${auth.username.substring(1)}!',
-                style: const TextStyle(color: Colors.white,
-                    fontSize: 22, fontWeight: FontWeight.bold),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -250,75 +293,90 @@ class _AuthorDashboardScreenState extends State<AuthorDashboardScreen> {
   }
 
   Widget _buildQuickActions() {
+    final acts = [
+      _AuthorAction(Icons.upload_file_rounded, S.uploadBookShort,
+          AppTheme.primary,
+          () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const UploadBookScreen()))
+              .then((_) => _loadData())),
+      _AuthorAction(Icons.account_balance_wallet_rounded, S.walletShort,
+          const Color(0xFF10B981),
+          () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const WalletScreen()))),
+      _AuthorAction(Icons.pie_chart_rounded, S.myEarnings,
+          const Color(0xFF0EA5E9),
+          () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const AuthorEarningsScreen()))),
+      _AuthorAction(Icons.people_rounded, S.readers,
+          const Color(0xFFF59E0B),
+          () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const AuthorReadersScreen()))),
+      _AuthorAction(Icons.person_rounded, S.profileShort,
+          const Color(0xFF7C3AED),
+          () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()))),
+      _AuthorAction(Icons.storefront_rounded, S.bookStoreShort,
+          const Color(0xFFEC4899),
+          () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const HomeScreen()))),
+    ];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 20, 0, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(S.quickActions,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary(context))),
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: _sectionLabel(S.quickActions),
+          ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              _actionBtn(Icons.upload_file_rounded, S.uploadBookShort,
-                AppTheme.primary, () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const UploadBookScreen()))
-                    .then((_) => _loadData())),
-              const SizedBox(width: 10),
-              _actionBtn(Icons.account_balance_wallet_rounded, S.walletShort,
-                const Color(0xFF10B981), () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const WalletScreen()))),
-              const SizedBox(width: 10),
-              _actionBtn(Icons.person_rounded, S.profileShort,
-                const Color(0xFFF59E0B), () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()))),
-              const SizedBox(width: 10),
-              _actionBtn(Icons.storefront_rounded, S.bookStoreShort,
-                const Color(0xFF7C3AED), () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const HomeScreen()))),
-            ],
+          SizedBox(
+            height: 88,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: acts.length,
+              padding: const EdgeInsets.only(right: 16),
+              itemBuilder: (_, i) {
+                final a = acts[i];
+                return GestureDetector(
+                  onTap: a.onTap,
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.card(context),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: a.color.withValues(alpha: 0.2)),
+                      boxShadow: [BoxShadow(
+                        color: a.color.withValues(alpha: 0.12),
+                        blurRadius: 8, offset: const Offset(0, 3))],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: a.color.withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(a.icon, color: a.color, size: 20),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(a.label, textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimary(context))),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _actionBtn(IconData icon, String label, Color color,
-      VoidCallback onTap) {
-    return Expanded(
-      child: Builder(
-        builder: (context) => GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(
-              color: AppTheme.card(context),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.15),
-                  blurRadius: 8, offset: const Offset(0, 3)),
-              ],
-            ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: color, size: 22),
-                ),
-                const SizedBox(height: 6),
-                Text(label, textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11,
-                      fontWeight: FontWeight.w600, color: AppTheme.textPrimary(context))),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -332,15 +390,28 @@ class _AuthorDashboardScreenState extends State<AuthorDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(S.myBooks,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary(context))),
-              TextButton.icon(
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: Text(S.t('Ongeza', 'Add New')),
-                onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const UploadBookScreen()))
+              _sectionLabel(S.myBooks),
+              GestureDetector(
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const UploadBookScreen()))
                     .then((_) => _loadData()),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.add_rounded,
+                        size: 14, color: AppTheme.primary),
+                    const SizedBox(width: 4),
+                    Text(S.t('Ongeza', 'Add New'),
+                        style: const TextStyle(fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primary)),
+                  ]),
+                ),
               ),
             ],
           ),
@@ -685,30 +756,60 @@ class _AuthorDashboardScreenState extends State<AuthorDashboardScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(20, 52, 20, 24),
-            decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF3730A3), Color(0xFF6D28D9), Color(0xFF4F46E5)],
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+              ),
+            ),
+            child: Stack(
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.white.withValues(alpha: 0.2),
-                  backgroundImage: (auth.avatarUrl != null && auth.avatarUrl!.isNotEmpty)
-                      ? NetworkImage(auth.avatarUrl!)
-                      : null,
-                  child: (auth.avatarUrl == null || auth.avatarUrl!.isEmpty)
-                      ? Text(
-                          auth.username.isEmpty ? 'M' :
-                          auth.username[0].toUpperCase(),
-                          style: const TextStyle(color: Colors.white,
-                              fontSize: 24, fontWeight: FontWeight.bold))
-                      : null,
+                Positioned(top: -10, right: -10, child: _bokeh(80, 0.12)),
+                Positioned(bottom: 0, right: 60, child: _bokeh(50, 0.09)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.5), width: 2),
+                      ),
+                      child: CircleAvatar(
+                        radius: 30,
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        backgroundImage: (auth.avatarUrl != null &&
+                                auth.avatarUrl!.isNotEmpty)
+                            ? NetworkImage(auth.avatarUrl!)
+                            : null,
+                        child: (auth.avatarUrl == null || auth.avatarUrl!.isEmpty)
+                            ? Text(
+                                auth.username.isEmpty ? 'A' :
+                                auth.username[0].toUpperCase(),
+                                style: const TextStyle(color: Colors.white,
+                                    fontSize: 24, fontWeight: FontWeight.bold))
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(auth.username,
+                      style: const TextStyle(color: Colors.white,
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(S.author,
+                        style: const TextStyle(color: Colors.white,
+                            fontSize: 11, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Text(auth.username,
-                  style: const TextStyle(color: Colors.white,
-                      fontSize: 16, fontWeight: FontWeight.bold)),
-                Text(S.author,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13)),
               ],
             ),
           ),
@@ -778,5 +879,39 @@ class _AuthorDashboardScreenState extends State<AuthorDashboardScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
     );
   }
+
+  Widget _bokeh(double size, double alpha) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: Colors.white.withValues(alpha: alpha),
+    ),
+  );
+
+  Widget _sectionLabel(String title) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 4, height: 20,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF6D28D9), Color(0xFF4F46E5)],
+            begin: Alignment.topCenter, end: Alignment.bottomCenter),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+      const SizedBox(width: 8),
+      Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+          color: AppTheme.textPrimary(context))),
+    ],
+  );
+}
+
+class _AuthorAction {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _AuthorAction(this.icon, this.label, this.color, this.onTap);
 }
 

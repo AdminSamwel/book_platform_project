@@ -268,8 +268,8 @@ class AudioContentView(APIView):
         if not book.has_audio:
             return Response({"detail": "Kitabu hiki hakina sauti."}, status=404)
 
-        # Angalia ruhusa (sawa na BookContentView)
-        if not _has_book_access(request.user, book):
+        # Angalia ruhusa — sauti inahitaji is_audio=True ili kupima kikomo cha Pro
+        if not _has_book_access(request.user, book, is_audio=True):
             if not _meets_min_age(request.user, book.min_age):
                 return HttpResponseForbidden(
                     f"Kitabu hiki ni kwa wasomaji wenye umri wa miaka {book.min_age}+.")
@@ -313,8 +313,13 @@ def _meets_min_age(user, min_age):
     return age >= min_age
 
 
-def _has_book_access(user, book):
-    """Angalia kama mtumiaji ana ruhusa ya kusoma kitabu (kununua/kujiandikisha/bure/mwandishi)."""
+def _has_book_access(user, book, is_audio=False):
+    """Angalia ruhusa ya kusoma/kusikiliza kitabu kulingana na mpango wa usajili."""
+    from subscriptions.models import (
+        UserSubscription, SystemSettings,
+        FreeBookSelection, SubscriptionBookAccess,
+    )
+
     if user.is_authenticated and user == book.author:
         return True
     if not _meets_min_age(user, book.min_age):
@@ -323,10 +328,73 @@ def _has_book_access(user, book):
         return True
     if not user.is_authenticated:
         return False
+    # Ununuzi wa moja kwa moja — daima unafungua kitabu
     if Purchase.objects.filter(user=user, book=book).exists():
         return True
-    if UserSubscription.objects.filter(user=user, is_active=True, end_date__gt=timezone.now()).exists():
+
+    # Angalia usajili hai
+    sub = UserSubscription.objects.filter(
+        user=user, is_active=True, end_date__gt=timezone.now()
+    ).select_related('plan').first()
+    if not sub or not sub.plan:
+        return False
+
+    plan_level = sub.plan.level
+
+    # Premium/Unlimited (level 3) — vitabu vyote
+    if plan_level >= 3:
         return True
+
+    # Ikiwa tayari ameshafungua kitabu hiki katika usajili huu — ruhusu
+    existing = SubscriptionBookAccess.objects.filter(
+        user=user, book=book, subscription=sub).first()
+    if existing:
+        return True
+
+    s = SystemSettings.get()
+    basic_limit = s.basic_book_limit
+
+    # Pro (level 2) — vitabu 2× basic + sauti hadi pro_audio_limit
+    if plan_level == 2:
+        pro_limit = basic_limit * 2
+        if is_audio:
+            audio_used = SubscriptionBookAccess.objects.filter(
+                user=user, subscription=sub, is_audio=True
+            ).values('book').distinct().count()
+            if audio_used >= s.pro_audio_limit:
+                return False
+        total_used = SubscriptionBookAccess.objects.filter(
+            user=user, subscription=sub
+        ).values('book').distinct().count()
+        if total_used >= pro_limit:
+            return False
+        SubscriptionBookAccess.objects.get_or_create(
+            user=user, book=book, subscription=sub,
+            defaults={'is_audio': is_audio})
+        return True
+
+    # Basic (level 1) — vitabu hadi basic_limit, hakuna sauti
+    if plan_level == 1:
+        if is_audio or getattr(book, 'has_audio', False) and not book.raw_file:
+            return False
+        total_used = SubscriptionBookAccess.objects.filter(
+            user=user, subscription=sub
+        ).values('book').distinct().count()
+        if total_used >= basic_limit:
+            return False
+        SubscriptionBookAccess.objects.get_or_create(
+            user=user, book=book, subscription=sub,
+            defaults={'is_audio': False})
+        return True
+
+    # Free (level 0) — kitabu kimoja kilichochaguliwa tu
+    if plan_level == 0:
+        try:
+            sel = FreeBookSelection.objects.get(user=user)
+            return sel.book_id == book.pk
+        except FreeBookSelection.DoesNotExist:
+            return False
+
     return False
 
 

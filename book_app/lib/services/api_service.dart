@@ -598,6 +598,41 @@ class ApiService {
     return null;
   }
 
+  Future<Map<String, dynamic>> fetchSystemSettings() async {
+    final res = await _getWithRefresh('${baseUrl}subscriptions/settings/');
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Imeshindwa kupakia mipangilio');
+  }
+
+  Future<Map<String, dynamic>> updateSystemSettings(Map<String, dynamic> data) async {
+    final res = await _patchWithRefresh(
+        '${baseUrl}subscriptions/settings/', body: data);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    final body = jsonDecode(res.body);
+    throw Exception(body['detail'] ?? 'Imeshindwa kuhifadhi mipangilio (${res.statusCode})');
+  }
+
+  Future<Map<String, dynamic>> fetchFreeBookSelection() async {
+    final res = await _getWithRefresh('${baseUrl}subscriptions/free-book-selection/');
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Imeshindwa kupakia uchaguzi wa kitabu');
+  }
+
+  Future<Map<String, dynamic>> selectFreeBook(int bookId) async {
+    final res = await _postWithRefresh(
+        '${baseUrl}subscriptions/free-book-selection/',
+        body: {'book_id': bookId});
+    if (res.statusCode == 201) return jsonDecode(res.body);
+    final body = jsonDecode(res.body);
+    throw Exception(body['detail'] ?? 'Imeshindwa kuchagua kitabu (${res.statusCode})');
+  }
+
+  Future<Map<String, dynamic>> fetchSubscriptionUsage() async {
+    final res = await _getWithRefresh('${baseUrl}subscriptions/usage/');
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Imeshindwa kupakia matumizi ya usajili');
+  }
+
   // ========== MAONI / COMMENTS ==========
   Future<List<dynamic>> fetchComments(int bookId) async {
     final res = await _getWithRefresh('${baseUrl}comments/$bookId/');

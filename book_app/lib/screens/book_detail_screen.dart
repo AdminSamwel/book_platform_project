@@ -1,10 +1,12 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/book_provider.dart';
 import '../providers/language_provider.dart';
 import '../l10n/app_strings.dart';
 import '../services/api_service.dart';
+import '../services/offline_book_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/responsive.dart';
 import '../widgets/safe_image.dart';
@@ -45,6 +47,13 @@ class _BookDetailScreenState extends State<BookDetailScreen>
   final TextEditingController _reviewCtrl = TextEditingController();
   bool _submittingRating = false;
 
+  // Subscription usage (for free-plan selection flow)
+  Map<String, dynamic>? _subUsage;
+
+  // Offline
+  bool _isOffline = false;
+  bool _downloadingOffline = false;
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +81,14 @@ class _BookDetailScreenState extends State<BookDetailScreen>
         _loading = false;
       });
       _loadRatings();
+      // Load subscription usage and offline status in background
+      _api.fetchSubscriptionUsage().then((u) {
+        if (mounted) setState(() => _subUsage = u);
+      }).catchError((_) {});
+      OfflineBookService.instance
+          .isAvailableOffline(widget.bookId)
+          .then((v) { if (mounted) setState(() => _isOffline = v); })
+          .catchError((_) {});
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
@@ -176,6 +193,7 @@ class _BookDetailScreenState extends State<BookDetailScreen>
         content: Text(S.selectRatingFirst), backgroundColor: AppTheme.warning));
       return;
     }
+    final bookProv = context.read<BookProvider>();
     setState(() => _submittingRating = true);
     try {
       await _api.submitRating(widget.bookId, _selectedStars, _reviewCtrl.text.trim());
@@ -183,8 +201,7 @@ class _BookDetailScreenState extends State<BookDetailScreen>
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(S.ratingSubmitted), backgroundColor: AppTheme.success));
         await _loadRatings();
-        // Refresh avg rating shown on this page
-        final data = await context.read<BookProvider>().fetchBookDetail(widget.bookId);
+        final data = await bookProv.fetchBookDetail(widget.bookId);
         if (mounted) setState(() => _detail = data);
       }
     } catch (e) {
@@ -226,13 +243,25 @@ class _BookDetailScreenState extends State<BookDetailScreen>
   Future<void> _purchase() async {
     setState(() => _buying = true);
     try {
-      await context.read<BookProvider>().purchaseBook(widget.bookId);
+      final result = await context.read<BookProvider>().purchaseBook(widget.bookId);
       if (mounted) {
+        final autoUpgraded = result['auto_upgraded'] == true;
+        final msg = autoUpgraded
+            ? (result['detail'] ?? S.buySuccess)
+            : S.buySuccess;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(S.buySuccess),
-          backgroundColor: AppTheme.success,
+          content: Text(msg.toString()),
+          backgroundColor: autoUpgraded ? const Color(0xFF7C3AED) : AppTheme.success,
+          duration: Duration(seconds: autoUpgraded ? 5 : 2),
         ));
-        setState(() {});
+        // Refresh subscription usage after purchase
+        _api.fetchSubscriptionUsage().then((u) {
+          if (mounted) setState(() => _subUsage = u);
+        }).catchError((_) {});
+        // Offer offline download
+        _offerOfflineDownload();
+        final data = await context.read<BookProvider>().fetchBookDetail(widget.bookId);
+        if (mounted) setState(() => _detail = data);
       }
     } catch (e) {
       if (mounted) {
@@ -242,7 +271,143 @@ class _BookDetailScreenState extends State<BookDetailScreen>
         ));
       }
     } finally {
-      setState(() => _buying = false);
+      if (mounted) setState(() => _buying = false);
+    }
+  }
+
+  void _offerOfflineDownload() {
+    if (!mounted) return;
+    final title = _detail?['title']?.toString() ?? '';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        const Icon(Icons.offline_bolt_rounded, color: Colors.white, size: 18),
+        const SizedBox(width: 8),
+        Expanded(child: Text(
+          S.t('Pakua "$title" kwa kusoma nje ya mtandao?',
+              'Download "$title" for offline reading?'),
+          maxLines: 2)),
+      ]),
+      backgroundColor: const Color(0xFF0EA5E9),
+      duration: const Duration(seconds: 6),
+      action: SnackBarAction(
+        label: S.t('Pakua', 'Download'),
+        textColor: Colors.white,
+        onPressed: _downloadForOffline,
+      ),
+    ));
+  }
+
+  Future<void> _downloadForOffline() async {
+    if (_downloadingOffline) return;
+    setState(() => _downloadingOffline = true);
+    try {
+      final result = await _api.fetchBookBytes(widget.bookId);
+      final raw   = result['bytes'] as Uint8List;
+      final ct    = (result['content_type'] as String?) ?? 'text/plain';
+      final title = _detail?['title']?.toString() ?? 'book_${widget.bookId}';
+      final ok = await OfflineBookService.instance.saveBook(
+        bookId: widget.bookId, bytes: raw,
+        contentType: ct, title: title,
+      );
+      if (mounted) {
+        setState(() => _isOffline = ok);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ok
+              ? S.t('Kitabu kimehifadhiwa kwa offline!', 'Book saved for offline!')
+              : S.t('Imeshindwa kuhifadhi — faili kubwa sana.',
+                    'Could not save — file too large.')),
+          backgroundColor: ok ? AppTheme.success : AppTheme.danger,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: AppTheme.danger));
+      }
+    } finally {
+      if (mounted) setState(() => _downloadingOffline = false);
+    }
+  }
+
+  Future<void> _selectFreeBook() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(children: [
+          const Icon(Icons.card_giftcard_rounded, color: AppTheme.primary),
+          const SizedBox(width: 10),
+          Text(S.t('Kitabu cha Bure', 'Free Book Selection')),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(S.t(
+              'Kama msomaji wa mpango wa Bure, unaweza kuchagua kitabu KIMOJA cha kulipa kusoma bila malipo.',
+              'As a Free plan reader, you can choose ONE paid book to read for free.',
+            ), style: const TextStyle(height: 1.5)),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(children: [
+                const Icon(Icons.warning_amber_rounded,
+                    color: AppTheme.warning, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(S.t(
+                  'Baada ya kuchagua huwezi kubadilisha. Chagua kwa makini!',
+                  'Once selected, you cannot change it. Choose carefully!',
+                ), style: const TextStyle(fontSize: 12, height: 1.4))),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '"${_detail?['title'] ?? ''}"',
+              style: const TextStyle(fontWeight: FontWeight.bold,
+                  fontSize: 15, color: AppTheme.primary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(S.cancel)),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(S.t('Chagua Kitabu Hiki', 'Select This Book'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final bookProv = context.read<BookProvider>();
+    try {
+      await _api.selectFreeBook(widget.bookId);
+      if (!mounted) return;
+      // Refresh usage and book detail
+      final usage  = await _api.fetchSubscriptionUsage();
+      final detail = await bookProv.fetchBookDetail(widget.bookId);
+      if (!mounted) return;
+      setState(() {
+        _subUsage = usage;
+        _detail   = detail;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(S.t(
+          'Umechagua kitabu chako cha bure! Sasa unaweza kusoma.',
+          'Your free book selected! You can now read it.')),
+        backgroundColor: AppTheme.success,
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: AppTheme.danger));
+      }
     }
   }
 
@@ -1018,6 +1183,58 @@ class _BookDetailScreenState extends State<BookDetailScreen>
             ),
           ),
           const SizedBox(height: 10),
+          // Free plan — offer one-time free book selection
+          if (_subUsage != null &&
+              _subUsage!['plan_level'] == 0 &&
+              !isFree &&
+              !(_subUsage?['has_audio'] == true) &&
+              !(_subUsage?['has_free_selection'] ?? false)) ...[
+            ElevatedButton.icon(
+              icon: const Icon(Icons.card_giftcard_rounded),
+              label: Text(
+                S.t('Chagua kama Kitabu Chako cha Bure', 'Use as My Free Book'),
+                style: const TextStyle(fontSize: 14)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                backgroundColor: const Color(0xFF10B981),
+              ),
+              onPressed: _selectFreeBook,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              S.t('Mpango wa Bure: kitabu kimoja cha kulipa bila malipo',
+                  'Free plan: one paid book at no cost'),
+              style: TextStyle(fontSize: 11,
+                  color: AppTheme.textSecondary(context)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+          ] else if (_subUsage != null &&
+              _subUsage!['plan_level'] == 0 &&
+              (_subUsage?['has_free_selection'] ?? false) &&
+              _subUsage!['free_book_id'] != widget.bookId) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.info_outline_rounded,
+                    color: Colors.orange, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(
+                  S.t(
+                    'Umeshachagua kitabu kingine kwa mpango wa Bure. Panda mpango kupata zaidi.',
+                    'You already selected a different free book. Upgrade for more.',
+                  ),
+                  style: const TextStyle(fontSize: 12, height: 1.4),
+                )),
+              ]),
+            ),
+            const SizedBox(height: 10),
+          ],
           ElevatedButton.icon(
             icon: const Icon(Icons.workspace_premium_rounded),
             label: Text(S.goToPlans, style: const TextStyle(fontSize: 15)),
@@ -1131,11 +1348,42 @@ class _BookDetailScreenState extends State<BookDetailScreen>
                 foregroundColor: AppTheme.primary,
                 side: const BorderSide(color: AppTheme.primary, width: 1.5),
               ),
-              onPressed: _buying ? null : () {
-                _purchase();
-              },
+              onPressed: _buying ? null : () { _purchase(); },
             ),
           ),
+
+        // Offline download button — inaonekana tu kwa vitabu vilivyonunuliwa
+        if (!blocked && !isFree) ...[
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            icon: _downloadingOffline
+                ? const SizedBox(width: 16, height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(_isOffline
+                    ? Icons.offline_bolt_rounded
+                    : Icons.download_for_offline_rounded,
+                    color: _isOffline
+                        ? const Color(0xFF10B981) : AppTheme.textSecondary(context)),
+            label: Text(
+              _downloadingOffline
+                  ? S.t('Inapakua...', 'Downloading...')
+                  : _isOffline
+                      ? S.t('Imepakuliwa (Offline)', 'Downloaded (Offline)')
+                      : S.t('Pakua kwa Offline', 'Download for Offline'),
+              style: TextStyle(
+                color: _isOffline ? const Color(0xFF10B981)
+                    : AppTheme.textSecondary(context)),
+            ),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              side: BorderSide(
+                color: _isOffline
+                    ? const Color(0xFF10B981)
+                    : AppTheme.borderColor(context)),
+            ),
+            onPressed: _downloadingOffline || _isOffline ? null : _downloadForOffline,
+          ),
+        ],
       ],
     );
   }
