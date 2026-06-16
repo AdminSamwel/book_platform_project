@@ -123,9 +123,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       _buildWideHeader(auth),
                       _buildSearchBarWidget(),
+                      _buildQuickActions(),
                       if (bookProv.bestSellers.isNotEmpty) ...[
-                        _buildSectionLabel(S.bestSellers),
-                        _buildNewBooksRow(bookProv.bestSellers.take(5).toList()),
+                        _buildFeaturedBook(bookProv.bestSellers.first),
+                        if (bookProv.bestSellers.length > 1) ...[
+                          _buildSectionLabel(S.bestSellers),
+                          _buildNewBooksRow(
+                              bookProv.bestSellers.skip(1).take(4).toList()),
+                        ],
                       ],
                       if (_userRole == 'reader' && bookProv.forYou.isNotEmpty) ...[
                         _buildSectionLabel(S.forYou, onViewAll: () => _openAllBooks(
@@ -153,52 +158,83 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildWideHeader(AuthProvider auth) {
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-      padding: const EdgeInsets.all(24),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        gradient: AppTheme.headerGradient,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(
-          color: AppTheme.primary.withValues(alpha: 0.3),
-          blurRadius: 20, offset: const Offset(0, 8))],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF3730A3), Color(0xFF6D28D9), Color(0xFF4F46E5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primary.withValues(alpha: 0.35),
+            blurRadius: 24, offset: const Offset(0, 10)),
+        ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // Bokeh circles
+          Positioned(top: -50, right: -40, child: _bokeh(180, 0.09)),
+          Positioned(top: 20, right: 160, child: _bokeh(50, 0.10)),
+          Positioned(bottom: -30, left: -20, child: _bokeh(120, 0.07)),
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(26),
+            child: Row(
               children: [
-                Text(
-                  _username.isEmpty ? '${S.greeting}!' :
-                  '${S.greeting}, ${_username[0].toUpperCase()}${_username.substring(1)}!',
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const Icon(Icons.waving_hand_rounded,
+                            color: Colors.amber, size: 16),
+                        const SizedBox(width: 7),
+                        Text(
+                          _username.isEmpty ? '${S.greeting}!'
+                              : '${S.greeting}, ${_username[0].toUpperCase()}'
+                                '${_username.substring(1)}!',
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              fontSize: 14),
+                        ),
+                      ]),
+                      const SizedBox(height: 6),
+                      Text(S.discoverBooks,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5)),
+                      const SizedBox(height: 10),
+                      Text(S.librarySubtitle,
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontSize: 14)),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(S.discoverBooks,
-                    style: const TextStyle(color: Colors.white, fontSize: 26,
-                        fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                Text(S.librarySubtitle,
-                    style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                const TextSizeToggle(light: true),
+                const SizedBox(width: 8),
+                const IconTheme(
+                  data: IconThemeData(color: Colors.white),
+                  child: Row(children: [CartButton(), NotificationBell()]),
+                ),
+                const SizedBox(width: 16),
+                GestureDetector(
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ProfileScreen())),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.35), width: 2.5),
+                    ),
+                    child: _userAvatar(radius: 26, fontSize: 20),
+                  ),
+                ),
               ],
             ),
-          ),
-          const TextSizeToggle(light: true),
-          const SizedBox(width: 8),
-          const IconTheme(
-            data: IconThemeData(color: Colors.white),
-            child: Row(children: [CartButton(), NotificationBell()]),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.auto_stories_rounded,
-                color: Colors.white, size: 40),
           ),
         ],
       ),
@@ -216,9 +252,14 @@ class _HomeScreenState extends State<HomeScreen> {
         slivers: [
           _buildSliverAppBar(auth),
           SliverToBoxAdapter(child: _buildSearchBarWidget()),
+          SliverToBoxAdapter(child: _buildQuickActions()),
           if (bookProv.bestSellers.isNotEmpty) ...[
-            SliverToBoxAdapter(child: _buildSectionLabel(S.bestSellers)),
-            SliverToBoxAdapter(child: _buildNewBooksRow(bookProv.bestSellers.take(5).toList())),
+            SliverToBoxAdapter(child: _buildFeaturedBook(bookProv.bestSellers.first)),
+            if (bookProv.bestSellers.length > 1) ...[
+              SliverToBoxAdapter(child: _buildSectionLabel(S.bestSellers)),
+              SliverToBoxAdapter(child: _buildNewBooksRow(
+                  bookProv.bestSellers.skip(1).take(4).toList())),
+            ],
           ],
           if (_userRole == 'reader' && bookProv.forYou.isNotEmpty) ...[
             SliverToBoxAdapter(child: _buildSectionLabel(S.forYou, onViewAll: () => _openAllBooks(
@@ -238,11 +279,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   SliverAppBar _buildSliverAppBar(AuthProvider auth) {
-    // Hesabu nafasi ya juu (status bar) ili maandishi ya "Habari..." na
-    // "Gundua Vitabu Vipya" yasiingiliane na "Maktaba" (title) wakati
-    // SliverAppBar inakunjwa — hii inategemea kifaa (notch, status bar, n.k.)
-    final topInset = MediaQuery.of(context).padding.top;
-    final expandedHeight = topInset + kToolbarHeight + 96;
+    final topInset      = MediaQuery.of(context).padding.top;
+    final expandedHeight = topInset + kToolbarHeight + 120.0;
 
     return SliverAppBar(
       expandedHeight: expandedHeight,
@@ -250,6 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
       floating: false,
       backgroundColor: AppTheme.primary,
       foregroundColor: Colors.white,
+      elevation: 0,
       leading: Builder(builder: (ctx) => IconButton(
         icon: const Icon(Icons.menu_rounded),
         onPressed: () => Scaffold.of(ctx).openDrawer(),
@@ -270,51 +309,118 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
       flexibleSpace: LayoutBuilder(
         builder: (context, constraints) {
-          // Kiwango cha kukunjwa: 1.0 = imefunguka kabisa, 0.0 = imekunjwa
-          final settings = context.dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>();
-          final deltaExtent = (settings?.maxExtent ?? expandedHeight) -
-              (settings?.minExtent ?? (topInset + kToolbarHeight));
-          final t = deltaExtent <= 0
-              ? 0.0
-              : (1.0 -
-                      ((settings?.currentExtent ?? expandedHeight) -
-                              (settings?.minExtent ?? (topInset + kToolbarHeight))) /
-                          deltaExtent)
-                  .clamp(0.0, 1.0);
-          // Maandishi ya juu yanafifia yanapokunjwa, ili yasiingiliane na "Maktaba"
-          final fadeOpacity = (1.0 - t * 1.6).clamp(0.0, 1.0);
+          final settings   = context.dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>();
+          final minExtent  = settings?.minExtent  ?? (topInset + kToolbarHeight);
+          final maxExtent  = settings?.maxExtent  ?? expandedHeight;
+          final curExtent  = settings?.currentExtent ?? expandedHeight;
+          final delta      = maxExtent - minExtent;
+          final t          = delta <= 0 ? 0.0
+              : ((1.0 - (curExtent - minExtent) / delta).clamp(0.0, 1.0));
+          final fadeOpacity = (1.0 - t * 1.5).clamp(0.0, 1.0);
 
           return FlexibleSpaceBar(
             collapseMode: CollapseMode.pin,
-            background: Container(
-              decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
-              padding: EdgeInsets.fromLTRB(20, topInset + kToolbarHeight + 4, 20, 16),
-              child: Opacity(
-                opacity: fadeOpacity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      _username.isEmpty ? '${S.greeting}!' :
-                      '${S.greeting}, ${_username[0].toUpperCase()}${_username.substring(1)}!',
-                      style: const TextStyle(color: Colors.white70, fontSize: 13),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+            background: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Gradient base
+                Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF3730A3), Color(0xFF6D28D9), Color(0xFF4F46E5)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    const SizedBox(height: 2),
-                    Text(S.discoverBooks,
-                        style: const TextStyle(color: Colors.white, fontSize: 20,
-                            fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                  ],
+                  ),
                 ),
-              ),
+                // Bokeh decorative circles
+                Positioned(top: -45, right: -35,
+                    child: _bokeh(190, 0.08)),
+                Positioned(top: 35, right: 72,
+                    child: _bokeh(58, 0.11)),
+                Positioned(bottom: -30, left: -25,
+                    child: _bokeh(140, 0.07)),
+                Positioned(bottom: 20, right: 140,
+                    child: _bokeh(36, 0.09)),
+                // Fading content (greeting + avatar)
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: fadeOpacity,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                          20, topInset + kToolbarHeight + 10, 20, 18),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Row(children: [
+                                  const Icon(Icons.waving_hand_rounded,
+                                      color: Colors.amber, size: 15),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      _username.isEmpty ? S.greeting
+                                          : '${S.greeting}, ${_username[0].toUpperCase()}'
+                                            '${_username.substring(1)}',
+                                      style: const TextStyle(
+                                          color: Colors.white70, fontSize: 13),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ]),
+                                const SizedBox(height: 5),
+                                Text(S.discoverBooks,
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 22,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -0.3),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 4),
+                                Text(S.librarySubtitle,
+                                    style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.65),
+                                        fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () => Navigator.push(context,
+                                MaterialPageRoute(
+                                    builder: (_) => const ProfileScreen())),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.4),
+                                    width: 2.5),
+                                boxShadow: [BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.25),
+                                  blurRadius: 12, offset: const Offset(0, 4))],
+                              ),
+                              child: _userAvatar(radius: 24, fontSize: 19),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             title: Opacity(
-              opacity: (t * 1.6).clamp(0.0, 1.0),
-              child: Text(S.library, style: const TextStyle(fontSize: 16)),
+              opacity: (t * 1.5).clamp(0.0, 1.0),
+              child: Text(S.library,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
             ),
             titlePadding: const EdgeInsetsDirectional.only(start: 56, bottom: 14),
             centerTitle: false,
@@ -324,9 +430,232 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _bokeh(double size, double alpha) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: Colors.white.withValues(alpha: alpha),
+    ),
+  );
+
   // ════════════════════════════════════════════
   // SHARED WIDGETS
   // ════════════════════════════════════════════
+
+  Widget _buildQuickActions() {
+    final pad = Responsive.pagePadding(context);
+    final items = <_HomeAction>[
+      _HomeAction(Icons.library_books_rounded, S.myLibrary,
+          const Color(0xFF4F46E5),
+          () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const MyLibraryScreen()))),
+      _HomeAction(Icons.favorite_rounded, S.wishlist,
+          const Color(0xFFE91E63),
+          () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const WishlistScreen()))),
+      _HomeAction(Icons.star_rounded, S.subscription,
+          const Color(0xFF9C27B0),
+          () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const SubscriptionScreen()))),
+      _HomeAction(Icons.account_balance_wallet_rounded, S.wallet,
+          const Color(0xFF10B981),
+          () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const WalletScreen()))),
+      if (_userRole == 'reader')
+        _HomeAction(Icons.tune_rounded, S.manageCategories,
+            const Color(0xFFF59E0B),
+            () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const ManageCategoriesScreen()))
+              .then((_) => _loadData())),
+    ];
+
+    return SizedBox(
+      height: 82,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.fromLTRB(pad, 10, pad, 6),
+        itemCount: items.length,
+        itemBuilder: (_, i) {
+          final a = items[i];
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: GestureDetector(
+              onTap: a.onTap,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.card(context),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: a.color.withValues(alpha: 0.2)),
+                  boxShadow: [BoxShadow(
+                    color: a.color.withValues(alpha: 0.08),
+                    blurRadius: 10, offset: const Offset(0, 3))],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: a.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(a.icon, size: 18, color: a.color),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(a.label,
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: AppTheme.textSecondary(context),
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFeaturedBook(dynamic book) {
+    final pad = Responsive.pagePadding(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(pad, 8, pad, 4),
+      child: GestureDetector(
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => BookDetailScreen(bookId: book.id))),
+        child: Container(
+          height: 158,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withValues(alpha: 0.22),
+                blurRadius: 22, offset: const Offset(0, 8)),
+            ],
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Blurred background
+              safeNetworkImage(book.coverImage, fit: BoxFit.cover),
+              // Gradient overlay
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.88),
+                      Colors.black.withValues(alpha: 0.25),
+                    ],
+                  ),
+                ),
+              ),
+              // Content row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Cover thumbnail
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          blurRadius: 12, offset: const Offset(0, 4))],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: safeNetworkImage(book.coverImage,
+                            width: 84, height: 120),
+                      ),
+                    ),
+                  ),
+                  // Info
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              gradient: AppTheme.primaryGradient,
+                              borderRadius: BorderRadius.circular(7)),
+                            child: Text(
+                              S.t('🔥 Inayopendwa', '🔥 Trending'),
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 10,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(height: 9),
+                          Text(book.title,
+                              maxLines: 2, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 15,
+                                  fontWeight: FontWeight.w800, height: 1.25)),
+                          const SizedBox(height: 5),
+                          Text(book.authorName,
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.70),
+                                  fontSize: 12)),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              if (book.ratingsCount > 0) ...[
+                                const Icon(Icons.star_rounded,
+                                    color: Colors.amber, size: 14),
+                                const SizedBox(width: 3),
+                                Text(book.avgRating.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 12,
+                                        fontWeight: FontWeight.w700)),
+                                const SizedBox(width: 12),
+                              ],
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: book.isFree
+                                      ? AppTheme.success
+                                      : Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: Colors.white.withValues(alpha: 0.3))),
+                                child: Text(
+                                  book.isFree ? S.free : 'TZS ${book.price}',
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 11,
+                                      fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(right: 14),
+                    child: Icon(Icons.arrow_forward_ios_rounded,
+                        color: Colors.white54, size: 14),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildSearchBarWidget() {
     final pad = Responsive.pagePadding(context);
@@ -335,17 +664,30 @@ class _HomeScreenState extends State<HomeScreen> {
       child: GestureDetector(
         onTap: _showSearchSheet,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: AppTheme.card(context),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppTheme.borderColor(context)),
-            boxShadow: AppTheme.shadow(context),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+                color: AppTheme.primary.withValues(alpha: 0.15), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primary.withValues(alpha: 0.07),
+                blurRadius: 16, offset: const Offset(0, 4)),
+            ],
           ),
           child: Row(
             children: [
-              Icon(Icons.search_rounded, color: AppTheme.textSecondary(context)),
-              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.search_rounded,
+                    color: AppTheme.primary, size: 18),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(S.searchHint,
                     style: TextStyle(
@@ -353,16 +695,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontSize: Responsive.bodySize(context))),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppTheme.bg(context),
+                  gradient: AppTheme.primaryGradient,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.borderColor(context)),
                 ),
                 child: Text(S.search,
-                    style: TextStyle(fontSize: 11,
-                        color: AppTheme.textSecondary(context))),
+                    style: const TextStyle(
+                        fontSize: 11, color: Colors.white,
+                        fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -374,36 +715,48 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSectionLabel(String label, {VoidCallback? onViewAll}) {
     final pad = Responsive.pagePadding(context);
     return Padding(
-      padding: EdgeInsets.fromLTRB(pad, 22, pad, 12),
+      padding: EdgeInsets.fromLTRB(pad, 24, pad, 12),
       child: Row(
         children: [
-          Container(width: 4, height: 20,
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(2))),
+          Container(
+            width: 4, height: 22,
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(label,
                 style: TextStyle(
-                  fontSize: Responsive.titleSize(context) - 2,
-                  fontWeight: FontWeight.bold,
+                  fontSize: Responsive.titleSize(context) - 1,
+                  fontWeight: FontWeight.w800,
                   color: AppTheme.textPrimary(context),
+                  letterSpacing: -0.2,
                 )),
           ),
           if (onViewAll != null)
             GestureDetector(
               onTap: onViewAll,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(S.viewAll,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.primary)),
-                  const Icon(Icons.arrow_forward_ios_rounded,
-                      size: 12, color: AppTheme.primary),
-                ],
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(S.viewAll,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.primary)),
+                    const SizedBox(width: 3),
+                    const Icon(Icons.arrow_forward_ios_rounded,
+                        size: 10, color: AppTheme.primary),
+                  ],
+                ),
               ),
             ),
         ],
@@ -1138,6 +1491,15 @@ class _HomeScreenState extends State<HomeScreen> {
     return (map[slug] ?? [AppTheme.primary, AppTheme.secondary])
         .cast<Color>();
   }
+}
+
+// ── Quick action data ──────────────────────────────────────────────────────────
+class _HomeAction {
+  final IconData    icon;
+  final String      label;
+  final Color       color;
+  final VoidCallback onTap;
+  const _HomeAction(this.icon, this.label, this.color, this.onTap);
 }
 
 // ── Search Results Screen ──
