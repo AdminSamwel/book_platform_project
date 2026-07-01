@@ -54,6 +54,11 @@ class _ReaderScreenState extends State<ReaderScreen> {
   // ── DRM: username embedded as watermark on every page ─────────────────────
   String _watermark = '';
 
+  // Blob URL ya iframe ya sasa — inafutwa (revoke) mara moja inapobadilishwa
+  // au skrini hii ikifungwa, ili maudhui yaliyofunguliwa nje ya mtandao
+  // yasibaki yanapatikana kwenye kumbukumbu ya kivinjari baada ya kuondoka.
+  String? _activeBlobUrl;
+
   @override
   void initState() {
     super.initState();
@@ -65,7 +70,27 @@ class _ReaderScreenState extends State<ReaderScreen> {
 
   @override
   void dispose() {
+    if (_activeBlobUrl != null) {
+      web.URL.revokeObjectURL(_activeBlobUrl!);
+      _activeBlobUrl = null;
+    }
     super.dispose();
+  }
+
+  /// Tengeneza blob URL kwa HTML iliyotolewa, ukifuta (revoke) ile ya
+  /// awali kwanza — kitabu hakiwahi kuwa faili linalofikika nje ya iframe
+  /// hii, na haliachwi kwenye kumbukumbu baada ya kubadilishwa.
+  String _trackedBlobUrl(String html) {
+    if (_activeBlobUrl != null) {
+      web.URL.revokeObjectURL(_activeBlobUrl!);
+    }
+    final blob = web.Blob(
+      [html.toJS].toJS,
+      web.BlobPropertyBag(type: 'text/html'),
+    );
+    final url = web.URL.createObjectURL(blob);
+    _activeBlobUrl = url;
+    return url;
   }
 
   // ── Content loading ───────────────────────────────────────────────────────
@@ -175,11 +200,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       iframe.style.height     = '100%';
       iframe.style.border     = 'none';
       iframe.style.background = '#525659';
-      final blob = web.Blob(
-        [html.toJS].toJS,
-        web.BlobPropertyBag(type: 'text/html'),
-      );
-      iframe.src = web.URL.createObjectURL(blob);
+      iframe.src = _trackedBlobUrl(html);
       _pdfIframe = iframe;
       return iframe;
     });
@@ -203,11 +224,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
       iframe.style.width  = '100%';
       iframe.style.height = '100%';
       iframe.style.border = 'none';
-      final blob = web.Blob(
-        [html.toJS].toJS,
-        web.BlobPropertyBag(type: 'text/html'),
-      );
-      iframe.src = web.URL.createObjectURL(blob);
+      iframe.src = _trackedBlobUrl(html);
       _textIframe = iframe;
       return iframe;
     });
@@ -644,11 +661,7 @@ ${_securityJs()}
         final newHtml = _buildSecurePdfHtml(
             _pdfBase64!, settings.readerLayout == ReaderLayout.paged, _darkMode);
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          final blob = web.Blob(
-            [newHtml.toJS].toJS,
-            web.BlobPropertyBag(type: 'text/html'),
-          );
-          _pdfIframe?.src = web.URL.createObjectURL(blob);
+          _pdfIframe?.src = _trackedBlobUrl(newHtml);
         });
       }
       return _securePdfViewer(settings);
@@ -662,11 +675,7 @@ ${_securityJs()}
         _textDarkBuilt = _darkMode;
         final newHtml = _buildSecureTextHtml(_rawText!, _fontSize, _darkMode);
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          final blob = web.Blob(
-            [newHtml.toJS].toJS,
-            web.BlobPropertyBag(type: 'text/html'),
-          );
-          _textIframe?.src = web.URL.createObjectURL(blob);
+          _textIframe?.src = _trackedBlobUrl(newHtml);
         });
       }
       return _secureTextViewer();

@@ -1136,25 +1136,44 @@ class _BookDetailScreenState extends State<BookDetailScreen>
       );
     }
 
-    return OutlinedButton.icon(
-      icon: _downloadingOffline
-          ? const SizedBox(width: 16, height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2))
-          : Icon(_isOfflineAvailable
-              ? Icons.offline_pin_rounded : Icons.download_for_offline_rounded),
-      label: Text(_downloadingOffline
-          ? S.t('Inapakua...', 'Downloading...')
-          : _isOfflineAvailable
-              ? S.t('Inapatikana Offline (futa)', 'Available Offline (remove)')
-              : S.t('Pakua kwa Offline', 'Download for Offline')),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        foregroundColor: _isOfflineAvailable ? AppTheme.success : AppTheme.primary,
-        side: BorderSide(
-            color: _isOfflineAvailable ? AppTheme.success : AppTheme.primary,
-            width: 1.5),
-      ),
-      onPressed: _downloadingOffline ? null : _toggleOfflineDownload,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(
+          icon: _downloadingOffline
+              ? const SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : Icon(_isOfflineAvailable
+                  ? Icons.offline_pin_rounded : Icons.download_for_offline_rounded),
+          label: Text(_downloadingOffline
+              ? S.t('Inapakua...', 'Downloading...')
+              : _isOfflineAvailable
+                  ? S.t('Inapatikana Offline (futa)', 'Available Offline (remove)')
+                  : S.t('Pakua kwa Offline', 'Download for Offline')),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            foregroundColor: _isOfflineAvailable ? AppTheme.success : AppTheme.primary,
+            side: BorderSide(
+                color: _isOfflineAvailable ? AppTheme.success : AppTheme.primary,
+                width: 1.5),
+          ),
+          onPressed: _downloadingOffline ? null : _toggleOfflineDownload,
+        ),
+        const SizedBox(height: 6),
+        Row(children: [
+          Icon(Icons.lock_outline_rounded, size: 13, color: AppTheme.textSecondary(context)),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              S.t(
+                'Nakala hii inahifadhiwa ndani ya app tu na inasomeka humu humu — haiwi faili la kawaida na haliwezi kutumwa/kushirikiwa nje ya app.',
+                'This copy is stored inside the app only and opens here — it is not a regular file and cannot be sent or shared outside the app.',
+              ),
+              style: TextStyle(fontSize: 10.5, color: AppTheme.textSecondary(context), height: 1.35),
+            ),
+          ),
+        ]),
+      ],
     );
   }
 

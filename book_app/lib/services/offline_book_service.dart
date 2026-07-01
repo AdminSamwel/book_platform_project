@@ -4,14 +4,18 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Encrypted offline book cache.
+/// Encrypted offline book cache — internal to the app only.
 ///
 /// On web: content is XOR-encrypted with a device-specific key and stored
 /// in SharedPreferences (browser localStorage). The raw bytes are never
 /// accessible without the key stored in FlutterSecureStorage.
 ///
-/// The user sees no "Download" button — caching happens automatically in the
-/// background after purchase or first read.
+/// This is NOT a file export: there is no path on disk the user (or another
+/// app) can open, share, or copy — [getBook] is the only way to read the
+/// cached bytes back, and only [ReaderScreen] calls it, decrypting into
+/// memory just long enough to render the page. Only purchased/free books are
+/// ever written here (see `canDownload` in ReaderScreen) — books unlocked
+/// through a monthly subscription are never cached and must be read online.
 class OfflineBookService {
   static const String _indexKey    = 'offline_books_index';
   static const String _drmKeyId    = 'offline_drm_key';
