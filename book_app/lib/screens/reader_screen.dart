@@ -335,18 +335,21 @@ window.addEventListener('focus', hideBlur);
   #toolbar {
     position:fixed; top:0; left:0; right:0;
     background:#323639; color:white;
-    padding:8px 16px;
-    display:flex; align-items:center; gap:12px;
+    padding:8px 10px;
+    display:flex; align-items:center; gap:6px;
     z-index:100; box-shadow:0 2px 4px rgba(0,0,0,0.3);
   }
   #toolbar button {
     background:#4a4e51; color:white; border:none;
-    padding:6px 14px; border-radius:4px;
-    cursor:pointer; font-size:14px;
+    padding:6px 10px; border-radius:4px;
+    cursor:pointer; font-size:13px; white-space:nowrap; flex-shrink:0;
   }
   #toolbar button:hover { background:#5a5e61; }
   #toolbar button:disabled { opacity:0.4; cursor:not-allowed; }
-  #pageInfo { color:#ccc; font-size:13px; flex:1; text-align:center; }
+  #pageInfo {
+    color:#ccc; font-size:12px; flex:1; text-align:center;
+    min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
   #loading {
     position:fixed; top:50%; left:50%;
     transform:translate(-50%,-50%);
@@ -374,6 +377,43 @@ window.addEventListener('focus', hideBlur);
   }
   #drm-blur p { color:#ccc; font-size:15px; margin-top:14px; }
   #drm-blur small { color:#888; font-size:12px; margin-top:6px; }
+  /* ── Go-to-page modal ── */
+  #gotoOverlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.55); z-index:200;
+    align-items:center; justify-content:center;
+  }
+  #gotoCard {
+    background:#2b2f31; color:white; width:min(320px, 88vw);
+    max-height:70vh; border-radius:12px; padding:16px;
+    display:flex; flex-direction:column; gap:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.5);
+  }
+  #gotoHeader {
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:15px; font-weight:bold;
+  }
+  #gotoHeader button {
+    background:none; border:none; color:#ccc;
+    font-size:20px; line-height:1; cursor:pointer; padding:0 4px;
+  }
+  #gotoQuick { display:flex; gap:8px; }
+  #gotoInput {
+    flex:1; min-width:0; padding:8px 10px; border-radius:6px;
+    border:1px solid #555; background:#1e2224; color:white; font-size:14px;
+    cursor:text; -webkit-user-select:text; user-select:text;
+  }
+  #gotoError { color:#ff8080; font-size:12px; min-height:14px; margin:0; }
+  #gotoGrid {
+    display:flex; flex-wrap:wrap; gap:6px; overflow-y:auto; max-height:38vh;
+    padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);
+  }
+  .goto-page-btn {
+    width:40px; height:34px; border-radius:6px; border:1px solid #4a4e51;
+    background:#3a3e41; color:#ddd; font-size:12px; cursor:pointer;
+  }
+  .goto-page-btn:hover  { background:#4a4e51; }
+  .goto-page-btn.active { background:#4F46E5; border-color:#4F46E5; color:white; font-weight:bold; }
 </style>
 </head>
 <body>
@@ -388,10 +428,26 @@ window.addEventListener('focus', hideBlur);
   <button id="prevBtn" disabled>&#8592; Iliyopita</button>
   <span id="pageInfo">Inapakia...</span>
   <button id="nextBtn" disabled>Inayofuata &#8594;</button>
+  <button id="gotoBtn" title="Chagua Ukurasa">Kurasa</button>
 </div>
 
 <div id="loading"><div>Inafungua kitabu...</div></div>
 <div id="pdfContainer"></div>
+
+<div id="gotoOverlay">
+  <div id="gotoCard">
+    <div id="gotoHeader">
+      <span>Chagua Ukurasa</span>
+      <button id="gotoCloseBtn">&times;</button>
+    </div>
+    <div id="gotoQuick">
+      <input id="gotoInput" type="number" inputmode="numeric" placeholder="Namba ya ukurasa" />
+      <button id="gotoConfirmBtn">Nenda</button>
+    </div>
+    <p id="gotoError"></p>
+    <div id="gotoGrid"></div>
+  </div>
+</div>
 
 <script>
 ${_securityJs()}
@@ -414,6 +470,7 @@ pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
   pdfDoc    = pdf;
   pageCount = pdf.numPages;
   document.getElementById('loading').style.display = 'none';
+  buildGotoGrid();
   if (PAGED) {
     pageNum = 1;
     showPage(pageNum);
@@ -507,6 +564,76 @@ function updatePageInfo() {
     document.getElementById('pageInfo').textContent = pageCount + ' kurasa';
   }
 }
+
+// ── Go-to-page: number grid + quick jump input ─────────────────────────────
+function buildGotoGrid() {
+  var grid = document.getElementById('gotoGrid');
+  grid.innerHTML = '';
+  for (var i = 1; i <= pageCount; i++) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'goto-page-btn';
+    btn.textContent = i;
+    btn.setAttribute('data-page', i);
+    btn.addEventListener('click', function() {
+      goToPage(parseInt(this.getAttribute('data-page'), 10));
+    });
+    grid.appendChild(btn);
+  }
+}
+
+function highlightActivePage() {
+  var current = PAGED ? pageNum : null;
+  var buttons = document.querySelectorAll('.goto-page-btn');
+  for (var i = 0; i < buttons.length; i++) {
+    var p = parseInt(buttons[i].getAttribute('data-page'), 10);
+    if (current && p === current) buttons[i].classList.add('active');
+    else buttons[i].classList.remove('active');
+  }
+}
+
+function openGoto() {
+  if (!pdfDoc || pageCount < 1) return;
+  document.getElementById('gotoInput').value = '';
+  document.getElementById('gotoError').textContent = '';
+  highlightActivePage();
+  document.getElementById('gotoOverlay').style.display = 'flex';
+  var activeBtn = document.querySelector('.goto-page-btn.active');
+  if (activeBtn) activeBtn.scrollIntoView({ block: 'center' });
+}
+
+function closeGoto() {
+  document.getElementById('gotoOverlay').style.display = 'none';
+}
+
+function goToPage(v) {
+  if (!v || v < 1 || v > pageCount) {
+    document.getElementById('gotoError').textContent =
+      'Weka namba kati ya 1 na ' + pageCount;
+    return;
+  }
+  closeGoto();
+  if (PAGED) {
+    pageNum = v;
+    showPage(pageNum);
+  } else {
+    var container = document.getElementById('pdfContainer');
+    var target = container.children[v - 1];
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+document.getElementById('gotoBtn').addEventListener('click', openGoto);
+document.getElementById('gotoCloseBtn').addEventListener('click', closeGoto);
+document.getElementById('gotoConfirmBtn').addEventListener('click', function() {
+  goToPage(parseInt(document.getElementById('gotoInput').value, 10));
+});
+document.getElementById('gotoInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); goToPage(parseInt(this.value, 10)); }
+});
+document.getElementById('gotoOverlay').addEventListener('click', function(e) {
+  if (e.target.id === 'gotoOverlay') closeGoto();
+});
 
 document.getElementById('prevBtn').addEventListener('click', function() {
   if (PAGED && pdfDoc && pageNum > 1) { pageNum--; showPage(pageNum); }
