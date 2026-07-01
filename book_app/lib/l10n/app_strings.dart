@@ -248,8 +248,8 @@ class S {
   static String get noPlans        => t('Hakuna mipango bado.', 'No plans yet.');
   static String get benefitAllBooks     => t('Vitabu Vyote', 'All Books');
   static String get benefitAllBooksDesc => t('Soma vitabu yote bila kikwazo', 'Read all books without limits');
-  static String get benefitOffline      => t('Soma Offline', 'Read Offline');
-  static String get benefitOfflineDesc  => t('Pakua na soma bila internet', 'Download and read without internet');
+  static String get benefitOffline      => t('Fungua Papo Hapo', 'Instant Access');
+  static String get benefitOfflineDesc  => t('Soma vitabu mtandaoni papo hapo, bila kusubiri', 'Read books online instantly, no waiting');
   static String get benefitCancel       => t('Futa Wakati Wowote', 'Cancel Anytime');
   static String get benefitCancelDesc   => t('Hakuna mkataba wa lazima', 'No required contract');
   static String get currentPlan    => t('Mpango wa Sasa', 'Current Plan');

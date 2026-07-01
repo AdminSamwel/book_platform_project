@@ -40,6 +40,10 @@ class _BookDetailScreenState extends State<BookDetailScreen>
   bool _inCart   = false;
   bool _addingToCart = false;
 
+  // Offline download (kwa vitabu vilivyonunuliwa/bure pekee)
+  bool _isOfflineAvailable = false;
+  bool _downloadingOffline = false;
+
   // Ratings
   List<dynamic> _ratings = [];
   Map<String, dynamic>? _myRating;
@@ -77,6 +81,7 @@ class _BookDetailScreenState extends State<BookDetailScreen>
         _loading = false;
       });
       _loadRatings();
+      _refreshOfflineStatus();
       // Load subscription usage in background
       _api.fetchSubscriptionUsage().then((u) {
         if (mounted) setState(() => _subUsage = u);
@@ -267,8 +272,8 @@ class _BookDetailScreenState extends State<BookDetailScreen>
     }
   }
 
-  /// Encrypted auto-cache — runs silently in background after purchase.
-  /// No visible "Download" button; fully transparent to the user.
+  /// Encrypted auto-cache — runs silently in background right after purchase
+  /// so the book is available offline immediately.
   void _autoCacheBook() {
     final title = _detail?['title']?.toString() ?? '';
     _api.fetchBookBytes(widget.bookId).then((result) {
@@ -279,8 +284,65 @@ class _BookDetailScreenState extends State<BookDetailScreen>
         bytes: bytes,
         contentType: ct,
         title: title,
-      );
+      ).then((_) {
+        if (mounted) setState(() => _isOfflineAvailable = true);
+      });
     }).catchError((_) {});
+  }
+
+  bool get _canDownload =>
+      _detail?['can_download'] == true || _detail?['is_free'] == true;
+
+  Future<void> _refreshOfflineStatus() async {
+    if (!_canDownload) return;
+    final available = await OfflineBookService.instance.isAvailableOffline(widget.bookId);
+    if (mounted) setState(() => _isOfflineAvailable = available);
+  }
+
+  /// Kitufe cha kupakua/kufuta nakala ya offline — kwa vitabu vilivyonunuliwa
+  /// au vya bure pekee. Vitabu vinavyofikiwa kwa usajili wa kila mwezi tu
+  /// havipati kitufe hiki — lazima visomwe mtandaoni.
+  Future<void> _toggleOfflineDownload() async {
+    if (_downloadingOffline) return;
+
+    if (_isOfflineAvailable) {
+      await OfflineBookService.instance.deleteBook(widget.bookId);
+      if (mounted) {
+        setState(() => _isOfflineAvailable = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(S.t('Nakala ya offline imefutwa', 'Offline copy removed')),
+          backgroundColor: AppTheme.textMuted,
+        ));
+      }
+      return;
+    }
+
+    setState(() => _downloadingOffline = true);
+    try {
+      final title  = _detail?['title']?.toString() ?? '';
+      final result = await _api.fetchBookBytes(widget.bookId);
+      final bytes  = result['bytes'] as Uint8List;
+      final ct     = (result['content_type'] as String? ?? 'text/plain');
+      final ok = await OfflineBookService.instance.saveBook(
+        bookId: widget.bookId, bytes: bytes, contentType: ct, title: title);
+      if (mounted) {
+        setState(() { _isOfflineAvailable = ok; _downloadingOffline = false; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(ok
+              ? S.t('Kitabu kimepakuliwa — sasa kinasomeka offline!', 'Book downloaded — now available offline!')
+              : S.t('Kitabu ni kikubwa mno kuhifadhiwa offline', 'Book is too large to store offline')),
+          backgroundColor: ok ? AppTheme.success : AppTheme.warning,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _downloadingOffline = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: AppTheme.danger,
+        ));
+      }
+    }
   }
 
   Future<void> _selectFreeBook() async {
@@ -1048,6 +1110,54 @@ class _BookDetailScreenState extends State<BookDetailScreen>
     );
   }
 
+  /// Kitufe cha "Pakua kwa Offline" (vitabu vilivyonunuliwa/bure) au ujumbe
+  /// wa kuwakumbusha wasomaji wa usajili kwamba lazima wasome mtandaoni.
+  Widget _buildOfflineControl() {
+    if (!_canDownload) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.textMuted.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(children: [
+          Icon(Icons.wifi_rounded, size: 16, color: AppTheme.textSecondary(context)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              S.t(
+                'Kitabu hiki kimefunguliwa kwa usajili — kinasomeka mtandaoni pekee, hakiwezi kupakuliwa.',
+                'This book is unlocked via subscription — it can only be read online and cannot be downloaded.',
+              ),
+              style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary(context), height: 1.4),
+            ),
+          ),
+        ]),
+      );
+    }
+
+    return OutlinedButton.icon(
+      icon: _downloadingOffline
+          ? const SizedBox(width: 16, height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2))
+          : Icon(_isOfflineAvailable
+              ? Icons.offline_pin_rounded : Icons.download_for_offline_rounded),
+      label: Text(_downloadingOffline
+          ? S.t('Inapakua...', 'Downloading...')
+          : _isOfflineAvailable
+              ? S.t('Inapatikana Offline (futa)', 'Available Offline (remove)')
+              : S.t('Pakua kwa Offline', 'Download for Offline')),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        foregroundColor: _isOfflineAvailable ? AppTheme.success : AppTheme.primary,
+        side: BorderSide(
+            color: _isOfflineAvailable ? AppTheme.success : AppTheme.primary,
+            width: 1.5),
+      ),
+      onPressed: _downloadingOffline ? null : _toggleOfflineDownload,
+    );
+  }
+
   Widget _buildActionButtons(bool isFree, bool hasText, bool hasAudio) {
     final isLocked = _detail!['is_locked'] == true;
     final requiredPlanName = _detail!['required_plan_name']?.toString();
@@ -1219,11 +1329,17 @@ class _BookDetailScreenState extends State<BookDetailScreen>
                 ),
                 onPressed: blocked ? null : () {
                   Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => ReaderScreen(bookId: widget.bookId)));
+                      builder: (_) => ReaderScreen(
+                          bookId: widget.bookId, canDownload: _canDownload)));
                 },
               ),
             ),
           ),
+
+        if (hasText && !blocked) ...[
+          const SizedBox(height: 10),
+          _buildOfflineControl(),
+        ],
 
         if (hasText) const SizedBox(height: 10),
 

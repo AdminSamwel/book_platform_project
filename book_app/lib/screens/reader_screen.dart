@@ -15,7 +15,12 @@ import '../theme/app_theme.dart';
 
 class ReaderScreen extends StatefulWidget {
   final int bookId;
-  const ReaderScreen({super.key, required this.bookId});
+  // Kweli kwa vitabu vilivyonunuliwa/bure pekee — hivi ndivyo vinavyoruhusiwa
+  // kuhifadhiwa kwenye kifaa kwa ajili ya usomaji nje ya mtandao. Vitabu
+  // vinavyofikiwa kwa usajili wa kila mwezi tu (bila ununuzi) hupaswa
+  // kusomwa ukiwa na mtandao pekee, hivyo havihifadhiwi humu.
+  final bool canDownload;
+  const ReaderScreen({super.key, required this.bookId, required this.canDownload});
 
   @override
   State<ReaderScreen> createState() => _ReaderScreenState();
@@ -78,8 +83,10 @@ class _ReaderScreenState extends State<ReaderScreen> {
       bytes = result['bytes'] as Uint8List;
       ct    = (result['content_type'] as String).toLowerCase();
 
-      // Cache encrypted in background — no await so reader opens immediately
-      if (mounted) {
+      // Cache encrypted in background — no await so reader opens immediately.
+      // Only vitabu vilivyonunuliwa/bure vinaruhusiwa kuhifadhiwa offline;
+      // usomaji wa usajili wa kila mwezi lazima ubaki mtandaoni tu.
+      if (mounted && widget.canDownload) {
         final title = widget.bookId.toString();
         OfflineBookService.instance.saveBook(
           bookId: widget.bookId, bytes: bytes,
@@ -88,25 +95,35 @@ class _ReaderScreenState extends State<ReaderScreen> {
       }
     } catch (_) {
       // 2. Server unreachable or offline — try encrypted local cache
-      try {
-        final cached = await OfflineBookService.instance.getBook(widget.bookId);
-        if (cached != null) {
-          bytes     = cached['bytes'] as Uint8List;
-          ct        = (cached['content_type'] as String? ?? 'text/plain').toLowerCase();
-          fromCache = true;
-        }
-      } catch (_) {}
+      // (tu kwa vitabu vinavyoruhusiwa kupakuliwa)
+      if (widget.canDownload) {
+        try {
+          final cached = await OfflineBookService.instance.getBook(widget.bookId);
+          if (cached != null) {
+            bytes     = cached['bytes'] as Uint8List;
+            ct        = (cached['content_type'] as String? ?? 'text/plain').toLowerCase();
+            fromCache = true;
+          }
+        } catch (_) {}
+      }
     }
 
     if (bytes == null || ct == null) {
       if (mounted) {
         setState(() {
-          _error   = S.t(
-            'Huna mtandao na kitabu hakijahifadhiwa. '
-            'Fungua kitabu mara moja ukiwa na mtandao ili kisomeke offline.',
-            'No internet and book not cached. '
-            'Open the book once while online so it becomes available offline.',
-          );
+          _error   = widget.canDownload
+              ? S.t(
+                  'Huna mtandao na kitabu hakijahifadhiwa. '
+                  'Fungua kitabu mara moja ukiwa na mtandao ili kisomeke offline.',
+                  'No internet and book not cached. '
+                  'Open the book once while online so it becomes available offline.',
+                )
+              : S.t(
+                  'Huna mtandao. Vitabu vya usajili wa kila mwezi vinasomwa '
+                  'ukiwa na mtandao pekee — haviwezi kupakuliwa kwa ajili ya offline.',
+                  'No internet connection. Books accessed via monthly subscription '
+                  'can only be read online — they cannot be downloaded for offline use.',
+                );
           _loading = false;
         });
       }

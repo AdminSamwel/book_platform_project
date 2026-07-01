@@ -294,7 +294,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final benefits = [
       [Icons.all_inclusive_rounded,
         S.benefitAllBooks, S.benefitAllBooksDesc],
-      [Icons.offline_bolt_rounded,
+      [Icons.bolt_rounded,
         S.benefitOffline, S.benefitOfflineDesc],
       [Icons.cancel_rounded,
         S.benefitCancel, S.benefitCancelDesc],

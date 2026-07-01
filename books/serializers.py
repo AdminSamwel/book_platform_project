@@ -16,6 +16,28 @@ def _user_plan_level(request):
     return sub.plan.level if sub and sub.plan else 0
 
 
+class DownloadAccessMixin:
+    """Sehemu ya pamoja ya 'is_purchased'/'can_download' — inaonyesha kama
+    mtumiaji amenunua kitabu moja kwa moja (hivyo anaweza kukipakua na
+    kukisoma nje ya mtandao). Wasomaji wa usajili wa kila mwezi tu (bila
+    ununuzi wa moja kwa moja) hawapewi ruhusa ya kupakua — lazima wasome
+    wakiwa mtandaoni."""
+
+    def get_is_purchased(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        if request.user == obj.author:
+            return True
+        from payments.models import Purchase
+        return Purchase.objects.filter(user=request.user, book=obj).exists()
+
+    def get_can_download(self, obj):
+        # Vitabu vya bure na vilivyonunuliwa moja kwa moja pekee ndivyo
+        # vinavyoweza kupakuliwa kwa ajili ya usomaji nje ya mtandao.
+        return bool(obj.is_free) or self.get_is_purchased(obj)
+
+
 class PlanLevelMixin:
     """Sehemu za pamoja za min_plan_level/is_locked/required_plan_name."""
 
@@ -90,7 +112,7 @@ class RatingMixin:
         return obj.purchase_set.count()
 
 
-class BookListSerializer(RatingMixin, PlanLevelMixin, AgeRestrictionMixin, serializers.ModelSerializer):
+class BookListSerializer(RatingMixin, PlanLevelMixin, AgeRestrictionMixin, DownloadAccessMixin, serializers.ModelSerializer):
     author_name    = serializers.CharField(source='author.username', read_only=True)
     category_name  = serializers.CharField(source='category.name', read_only=True)
     has_audio      = serializers.SerializerMethodField(read_only=True)
@@ -101,6 +123,8 @@ class BookListSerializer(RatingMixin, PlanLevelMixin, AgeRestrictionMixin, seria
     is_locked        = serializers.SerializerMethodField(read_only=True)
     required_plan_name = serializers.SerializerMethodField(read_only=True)
     is_age_restricted = serializers.SerializerMethodField(read_only=True)
+    is_purchased      = serializers.SerializerMethodField(read_only=True)
+    can_download      = serializers.SerializerMethodField(read_only=True)
 
     def get_has_audio(self, obj):
         return bool(obj.audio_file or obj.encrypted_audio)
@@ -115,9 +139,10 @@ class BookListSerializer(RatingMixin, PlanLevelMixin, AgeRestrictionMixin, seria
                   'has_audio', 'has_text',
                   'avg_rating', 'ratings_count', 'purchases_count',
                   'min_plan_level', 'is_locked', 'required_plan_name',
-                  'min_age', 'is_age_restricted']
+                  'min_age', 'is_age_restricted',
+                  'is_purchased', 'can_download']
 
-class BookDetailSerializer(RatingMixin, PlanLevelMixin, AgeRestrictionMixin, serializers.ModelSerializer):
+class BookDetailSerializer(RatingMixin, PlanLevelMixin, AgeRestrictionMixin, DownloadAccessMixin, serializers.ModelSerializer):
     author_name    = serializers.CharField(source='author.username', read_only=True)
     category_name  = serializers.CharField(source='category.name', read_only=True)
     file_type      = serializers.SerializerMethodField(read_only=True)
@@ -129,6 +154,8 @@ class BookDetailSerializer(RatingMixin, PlanLevelMixin, AgeRestrictionMixin, ser
     is_locked        = serializers.SerializerMethodField(read_only=True)
     required_plan_name = serializers.SerializerMethodField(read_only=True)
     is_age_restricted = serializers.SerializerMethodField(read_only=True)
+    is_purchased      = serializers.SerializerMethodField(read_only=True)
+    can_download      = serializers.SerializerMethodField(read_only=True)
     share_url        = serializers.SerializerMethodField(read_only=True)
 
     def get_share_url(self, obj):
@@ -156,6 +183,7 @@ class BookDetailSerializer(RatingMixin, PlanLevelMixin, AgeRestrictionMixin, ser
                   'raw_file', 'audio_file', 'is_published', 'created_at',
                   'file_type', 'has_audio', 'has_text',
                   'avg_rating', 'ratings_count', 'purchases_count',
+                  'is_purchased', 'can_download',
                   'share_url',
                   # Library metadata
                   'isbn', 'book_authors', 'publisher', 'year_published',
@@ -164,6 +192,7 @@ class BookDetailSerializer(RatingMixin, PlanLevelMixin, AgeRestrictionMixin, ser
                             'file_type', 'has_audio', 'has_text',
                             'avg_rating', 'ratings_count', 'purchases_count',
                             'is_locked', 'required_plan_name', 'is_age_restricted',
+                            'is_purchased', 'can_download',
                             'share_url']
         extra_kwargs = {
             'raw_file':   {'write_only': True, 'required': False},
