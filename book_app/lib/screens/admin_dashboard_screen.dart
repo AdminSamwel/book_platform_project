@@ -96,40 +96,52 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Positioned(top: -20, right: -20, child: _bokeh(150, 0.14)),
                     Positioned(bottom: 10, right: 90, child: _bokeh(70, 0.11)),
                     Positioned(top: 50, left: -25, child: _bokeh(100, 0.09)),
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                          20, topInset + kToolbarHeight + 4, 20, 18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
+                    // ClipRect + OverflowBox: maudhui yanapangwa kwa urefu
+                    // kamili wa header wakati wote; header inapojikunja
+                    // yanakatwa badala ya kufurika (RenderFlex overflow).
+                    Positioned.fill(
+                      child: ClipRect(
+                        child: OverflowBox(
+                          alignment: Alignment.bottomCenter,
+                          minHeight: topInset + kToolbarHeight + 110,
+                          maxHeight: topInset + kToolbarHeight + 110,
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                                20, topInset + kToolbarHeight + 4, 20, 18),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                    const Icon(Icons.shield_rounded,
+                                        color: Colors.white70, size: 12),
+                                    const SizedBox(width: 5),
+                                    Text(S.adminDashboard,
+                                        style: const TextStyle(
+                                            color: Colors.white70, fontSize: 11)),
+                                  ]),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  auth.username.isEmpty
+                                      ? '${S.greeting}!'
+                                      : '${S.greeting}, ${auth.username}!',
+                                  style: const TextStyle(color: Colors.white,
+                                      fontSize: 22, fontWeight: FontWeight.w800),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
-                            child: Row(mainAxisSize: MainAxisSize.min,
-                                children: [
-                              const Icon(Icons.shield_rounded,
-                                  color: Colors.white70, size: 12),
-                              const SizedBox(width: 5),
-                              Text(S.adminDashboard,
-                                  style: const TextStyle(
-                                      color: Colors.white70, fontSize: 11)),
-                            ]),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            auth.username.isEmpty
-                                ? '${S.greeting}!'
-                                : '${S.greeting}, ${auth.username}!',
-                            style: const TextStyle(color: Colors.white,
-                                fontSize: 22, fontWeight: FontWeight.w800),
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ],

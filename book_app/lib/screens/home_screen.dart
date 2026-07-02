@@ -342,13 +342,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: _bokeh(140, 0.07)),
                 Positioned(bottom: 20, right: 140,
                     child: _bokeh(36, 0.09)),
-                // Fading content (greeting + avatar)
+                // Fading content (greeting + avatar).
+                // ClipRect + OverflowBox: maudhui yanapangwa kwa urefu kamili
+                // wa header wakati wote; header inapojikunja maudhui yanakatwa
+                // (clip) badala ya kufurika (RenderFlex overflow) wakati wa scroll.
                 Positioned.fill(
-                  child: Opacity(
-                    opacity: fadeOpacity,
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                          20, topInset + kToolbarHeight + 10, 20, 18),
+                  child: ClipRect(
+                    child: OverflowBox(
+                      alignment: Alignment.bottomCenter,
+                      minHeight: maxExtent,
+                      maxHeight: maxExtent,
+                      child: Opacity(
+                        opacity: fadeOpacity,
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(
+                              20, topInset + kToolbarHeight + 10, 20, 18),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -410,6 +418,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ],
+                      ),
+                        ),
                       ),
                     ),
                   ),

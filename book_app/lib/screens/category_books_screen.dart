@@ -105,8 +105,9 @@ class _CategoryBooksScreenState extends State<CategoryBooksScreen> {
   }
 
   SliverAppBar _buildHeader() {
+    final expandedH = Responsive.isMobile(context) ? 152.0 : 180.0;
     return SliverAppBar(
-      expandedHeight: Responsive.isMobile(context) ? 152 : 180,
+      expandedHeight: expandedH,
       pinned: true,
       backgroundColor: AppTheme.primary,
       foregroundColor: Colors.white,
@@ -115,36 +116,46 @@ class _CategoryBooksScreenState extends State<CategoryBooksScreen> {
         SizedBox(width: 8),
       ],
       flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
-          padding: const EdgeInsets.fromLTRB(20, 80, 20, 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text(widget.categoryName,
-                  style: TextStyle(color: Colors.white,
-                      fontSize: Responsive.titleSize(context),
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Row(
+        // ClipRect + OverflowBox: maudhui ya header yanapangwa kwa urefu
+        // kamili wakati wote; header inapojikunja (scroll) yanakatwa badala
+        // ya kufurika (RenderFlex overflow).
+        background: ClipRect(
+          child: OverflowBox(
+            alignment: Alignment.bottomCenter,
+            minHeight: expandedH,
+            maxHeight: expandedH,
+            child: Container(
+              decoration: const BoxDecoration(gradient: AppTheme.headerGradient),
+              padding: const EdgeInsets.fromLTRB(20, 80, 20, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${widget.bookCount} ${widget.bookCount == 1 ? "kitabu" : "vitabu"}',
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 12),
-                    ),
+                  Text(widget.categoryName,
+                      style: TextStyle(color: Colors.white,
+                          fontSize: Responsive.titleSize(context),
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${widget.bookCount} ${widget.bookCount == 1 ? "kitabu" : "vitabu"}',
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 12),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
         title: Text(widget.categoryName,
