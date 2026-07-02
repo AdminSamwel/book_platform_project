@@ -328,17 +328,19 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       color: AppTheme.primary, size: 18),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(b[1] as String,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 13,
-                          color: AppTheme.textPrimary(context))),
-                    Text(b[2] as String,
-                      style: TextStyle(
-                          fontSize: 11, color: AppTheme.textSecondary(context))),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(b[1] as String,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 13,
+                            color: AppTheme.textPrimary(context))),
+                      Text(b[2] as String,
+                        style: TextStyle(
+                            fontSize: 11, color: AppTheme.textSecondary(context))),
+                    ],
+                  ),
                 ),
               ],
             ),

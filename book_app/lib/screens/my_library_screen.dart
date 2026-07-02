@@ -282,11 +282,15 @@ class _MyLibraryScreenState extends State<MyLibraryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary(context), height: 1.2)),
+                    // Flexible: kwenye skrini finyu kichwa kinapungua hadi
+                    // mstari 1 badala ya kufurika (overflow) chini ya kadi
+                    Flexible(
+                      child: Text(title, maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary(context), height: 1.2)),
+                    ),
                     const SizedBox(height: 2),
                     Text(author, maxLines: 1,
                         overflow: TextOverflow.ellipsis,
